@@ -33,7 +33,7 @@ const LoginPage = () => {
     } else {
       notification.error({
         message: "LOGIN USER",
-        description: "error"
+        description: res?.message || "Đăng nhập thất bại"
       });
     }
   };

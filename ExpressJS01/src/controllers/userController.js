@@ -19,10 +19,10 @@ const handleLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
         const data = await loginService(email, password);
-        if (data) {
+        if (data && data.EC === 0) {
             return res.status(200).json(data);
         } else {
-            return res.status(400).json({ message: 'Đăng nhập thất bại' });
+            return res.status(400).json({ message: data?.EM || 'Đăng nhập thất bại' });
         }
     } catch (error) {
         console.log(error);
