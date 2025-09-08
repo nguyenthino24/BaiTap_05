@@ -13,8 +13,12 @@ const HomePage = () => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
+
+        // Do axios call - interceptor đã return response.data
         const response = await axios.get('/v1/api/products/with-category');
-        setProducts(Array.isArray(response.data) ? response.data : []);
+
+        // response đã là data (không cần response.data nữa)
+        setProducts(Array.isArray(response) ? response : []);
       } catch (error) {
         console.error('Error fetching products:', error);
       } finally {
@@ -45,11 +49,17 @@ const HomePage = () => {
               <Col span={8} key={product.id}>
                 <Card
                   hoverable
-                  cover={product.image_url ? <img alt={product.name} src={product.image_url} /> : null}
+                  cover={
+                    product.image_url ? (
+                      <img alt={product.name} src={product.image_url} />
+                    ) : null
+                  }
                 >
                   <Card.Meta
                     title={product.name}
-                    description={`${product.price} VND - ${product.category_name || 'Chưa có danh mục'}`}
+                    description={`${product.price} VND - ${
+                      product.category_name || 'Chưa có danh mục'
+                    }`}
                   />
                 </Card>
               </Col>
@@ -59,6 +69,6 @@ const HomePage = () => {
       </div>
     </div>
   );
-}
+};
 
 export default HomePage;

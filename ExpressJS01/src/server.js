@@ -1,10 +1,11 @@
+// server.js
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const configViewEngine = require('./config/viewEngine');
 const apiRoutes = require('./routes/api');
-const connection = require('./config/database'); // file database.js đã đổi sang mysql
 const { getHomepage } = require('./controllers/homeController.js');
-const cors = require('cors');
+const { pool } = require('./models/user'); // dùng pool thống nhất
 
 const app = express();
 const port = process.env.PORT || 8888;
@@ -15,21 +16,24 @@ app.use(express.urlencoded({ extended: true }));
 
 configViewEngine(app);
 
+// web pages
 const webAPI = express.Router();
 webAPI.get('/', getHomepage);
 app.use('/', webAPI);
 
+// REST API
 app.use('/v1/api', apiRoutes);
 
+// Khởi động sau khi kiểm tra kết nối DB
 (async () => {
-    try {
-        const db = await connection();
-        console.log('✅ MySQL Database connected!');
-
-        app.listen(port, () => {
-            console.log(`🚀 Backend Nodejs App listening on port ${port}`);
-        });
-    } catch (error) {
-        console.log('❌ Error connect to DB: ', error);
-    }
+  try {
+    const conn = await pool.getConnection();
+    await conn.ping();
+    conn.release();
+    console.log('✅ MySQL Database connected!');
+    app.listen(port, () => console.log(`🚀 Backend Nodejs App listening on port ${port}`));
+  } catch (error) {
+    console.log('❌ Error connect to DB:', error);
+    process.exit(1);
+  }
 })();

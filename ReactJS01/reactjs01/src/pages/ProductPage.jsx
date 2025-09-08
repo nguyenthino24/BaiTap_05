@@ -15,27 +15,28 @@ const ProductPage = () => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Lấy danh sách sản phẩm và danh mục khi component được mount
+  // Hàm fetch dữ liệu
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [productResponse, categoryResponse] = await Promise.all([
+        axios.get('/v1/api/products/with-category'),
+        axios.get('/v1/api/categories')
+      ]);
+
+      // Do axios instance trả trực tiếp data rồi → dùng luôn
+      setProducts(Array.isArray(productResponse) ? productResponse : []);
+      setCategories(Array.isArray(categoryResponse) ? categoryResponse : []);
+    } catch (err) {
+      console.error('API error:', err);
+      setError('Lỗi khi tải dữ liệu: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gọi fetchData khi component mount
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [productResponse, categoryResponse] = await Promise.all([
-          axios.get('/v1/api/products/with-category'),
-          axios.get('/v1/api/categories')
-        ]);
-        console.log('Products response:', productResponse.data); // Debug
-        console.log('Categories response:', categoryResponse.data); // Debug
-        // Đảm bảo products và categories là mảng
-        setProducts(Array.isArray(productResponse.data) ? productResponse.data : []);
-        setCategories(Array.isArray(categoryResponse.data) ? categoryResponse.data : []);
-      } catch (err) {
-        console.error('API error:', err); // Debug
-        setError('Lỗi khi tải dữ liệu: ' + err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, []);
 
@@ -53,14 +54,16 @@ const ProductPage = () => {
 
     try {
       const response = await axios.post('/v1/api/products', formData);
-      setSuccess(response.data.message);
+      setSuccess(response.message); // response đã là data
+
+      // Fetch lại dữ liệu sau khi thêm thành công
+      await fetchData();
+
+      // Reset form
       setFormData({ name: '', brand: '', price: '', image_url: '', category_id: '' });
-      // Cập nhật lại danh sách sản phẩm
-      const productResponse = await axios.get('/v1/api/products/with-category');
-      setProducts(Array.isArray(productResponse.data) ? productResponse.data : []);
     } catch (err) {
-      console.error('Submit error:', err); // Debug
-      setError(err.response?.data?.message || 'Lỗi khi thêm sản phẩm');
+      console.error('Submit error:', err);
+      setError(err.message || 'Lỗi khi thêm sản phẩm');
     }
   };
 
@@ -73,7 +76,7 @@ const ProductPage = () => {
         <h2 className="text-2xl font-semibold mb-4">Thêm Sản Phẩm Mới</h2>
         {error && <p className="text-red-500 mb-4">{error}</p>}
         {success && <p className="text-green-500 mb-4">{success}</p>}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
             type="text"
             name="name"
@@ -124,17 +127,17 @@ const ProductPage = () => {
                 </option>
               ))
             ) : (
-              <option disabled>Không có danh mục nào được tải</option>
+              <option disabled>Không có danh mục nào</option>
             )}
           </select>
           <button
-            onClick={handleSubmit}
+            type="submit"
             className="col-span-1 md:col-span-2 bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition"
-            disabled={categories.length === 0} // Vô hiệu hóa nút nếu không có danh mục
+            disabled={loading || categories.length === 0}
           >
             Thêm Sản Phẩm
           </button>
-        </div>
+        </form>
       </div>
 
       {/* Trạng thái tải */}

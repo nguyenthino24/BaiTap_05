@@ -1,30 +1,26 @@
+// routes/api.js
 const express = require('express');
 const { createUser, handleLogin, getUser, getAccount } = require('../controllers/userController');
-const productController = require('../controllers/productController');
-const categoryController = require('../controllers/categoryController');
+const productRoutes = require('./product');
+const categoryRoutes = require('./category');
 const auth = require('../middleware/auth');
 const delay = require('../middleware/delay');
 
 const routerAPI = express.Router();
 
-// Loại bỏ routerAPI.all("/*", auth) và áp dụng auth cho các route cụ thể
-routerAPI.get('/', (req, res) => {
-    return res.status(200).json('Hello world api');
-});
+// health
+routerAPI.get('/', (req, res) => res.status(200).json('Hello world api'));
 
+// auth
 routerAPI.post('/register', createUser);
 routerAPI.post('/login', handleLogin);
 
-routerAPI.get('/user', auth, getUser); // Áp dụng auth cho route /user
-routerAPI.get('/account', delay, getAccount); // Giữ delay cho /account
+// protected
+routerAPI.get('/user', auth, getUser);
+routerAPI.get('/account', delay, getAccount);
 
-// Add product routes
-routerAPI.get('/products', productController.getAllProducts);
-routerAPI.post('/products', productController.createProduct);
-routerAPI.get('/products/with-category', productController.getProductsWithCategories);
-
-// Add category routes
-routerAPI.get('/categories', categoryController.getAllCategories);
-routerAPI.post('/categories', categoryController.createCategory);
+// business
+routerAPI.use('/products', productRoutes);    // /v1/api/products/...
+routerAPI.use('/categories', categoryRoutes); // /v1/api/categories/...
 
 module.exports = routerAPI;

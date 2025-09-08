@@ -1,29 +1,23 @@
-const connection = require("../config/database");
+// controllers/categoryController.js
+const Category = require("../models/category");
 
 exports.getAllCategories = async (req, res) => {
   try {
-    const conn = await connection();
-    const [rows] = await conn.execute("SELECT * FROM categories ORDER BY created_at DESC");
-    res.json(rows);
+    const categories = await Category.getAllCategories();
+    res.json(categories);
   } catch (error) {
-    console.error(" Lỗi khi lấy danh mục:", error.message);
+    console.error("❌ Lỗi khi lấy danh mục:", error.message);
     res.status(500).json({ message: "Lỗi server" });
   }
 };
 
 exports.getCategoryById = async (req, res) => {
   try {
-    const { id } = req.params;
-    const conn = await connection();
-    const [rows] = await conn.execute("SELECT * FROM categories WHERE id = ?", [id]);
-
-    if (rows.length === 0) {
-      return res.status(404).json({ message: "Không tìm thấy danh mục" });
-    }
-
-    res.json(rows[0]);
+    const category = await Category.getCategoryById(req.params.id);
+    if (!category) return res.status(404).json({ message: "Không tìm thấy danh mục" });
+    res.json(category);
   } catch (error) {
-    console.error(" Lỗi khi lấy danh mục:", error.message);
+    console.error("❌ Lỗi khi lấy danh mục theo ID:", error.message);
     res.status(500).json({ message: "Lỗi server" });
   }
 };
@@ -31,59 +25,32 @@ exports.getCategoryById = async (req, res) => {
 exports.createCategory = async (req, res) => {
   try {
     const { name, description } = req.body;
-    if (!name) {
-      return res.status(400).json({ message: "Tên danh mục là bắt buộc" });
-    }
-
-    const conn = await connection();
-    const [result] = await conn.execute(
-      "INSERT INTO categories (name, description) VALUES (?, ?)",
-      [name, description || null]
-    );
-
-    res.status(201).json({ message: " Danh mục đã được thêm", id: result.insertId });
+    if (!name) return res.status(400).json({ message: "Tên danh mục là bắt buộc" });
+    const created = await Category.createCategory(name, description);
+    res.status(201).json({ message: "✅ Danh mục đã được thêm", category: created });
   } catch (error) {
-    console.error(" Lỗi khi thêm danh mục:", error.message);
+    console.error("❌ Lỗi khi thêm danh mục:", error.message);
     res.status(500).json({ message: "Lỗi server" });
   }
 };
 
 exports.updateCategory = async (req, res) => {
   try {
-    const { id } = req.params;
     const { name, description } = req.body;
-
-    const conn = await connection();
-    const [result] = await conn.execute(
-      "UPDATE categories SET name = ?, description = ? WHERE id = ?",
-      [name, description || null, id]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Không tìm thấy danh mục" });
-    }
-
-    res.json({ message: " Cập nhật danh mục thành công" });
+    const updated = await Category.updateCategory(req.params.id, name, description);
+    res.json({ message: "✅ Cập nhật danh mục thành công", category: updated });
   } catch (error) {
-    console.error(" Lỗi khi cập nhật danh mục:", error.message);
-    res.status(500).json({ message: "Lỗi server" });
+    const msg = error?.message === "Không tìm thấy danh mục" ? 404 : 500;
+    res.status(msg).json({ message: error.message || "Lỗi server" });
   }
 };
 
 exports.deleteCategory = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const conn = await connection();
-    const [result] = await conn.execute("DELETE FROM categories WHERE id = ?", [id]);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Không tìm thấy danh mục" });
-    }
-
-    res.json({ message: " Đã xóa danh mục" });
+    await Category.deleteCategory(req.params.id);
+    res.json({ message: "🗑️ Đã xóa danh mục" });
   } catch (error) {
-    console.error(" Lỗi khi xóa danh mục:", error.message);
-    res.status(500).json({ message: "Lỗi server" });
+    const msg = error?.message === "Không tìm thấy danh mục" ? 404 : 500;
+    res.status(msg).json({ message: error.message || "Lỗi server" });
   }
 };
