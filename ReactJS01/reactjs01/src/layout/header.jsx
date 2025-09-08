@@ -9,11 +9,16 @@ const Header = () => {
   const { auth, setAuth } = useContext(AuthContext);
   console.log(">>> check auth: ", auth);
 
-  const items = [
+const items = [
     {
       label: <Link to={"/"}>Home Page</Link>,
       key: 'home',
       icon: <HomeOutlined />,
+    },
+    {
+      label: <Link to={"/products"}>Products</Link>,
+      key: 'products',
+      icon: <UsergroupAddOutlined />,
     },
     ...(auth.isAuthenticated ? [
       {
