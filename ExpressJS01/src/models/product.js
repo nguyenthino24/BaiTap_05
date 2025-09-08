@@ -1,4 +1,5 @@
 const { pool } = require('./user'); // Sử dụng pool từ models/user.js
+const esClient = require('../config/elasticsearch');
 
 // Khởi tạo bảng products
 async function initializeProductTable() {
@@ -10,6 +11,8 @@ async function initializeProductTable() {
       price DECIMAL(10,2) NOT NULL,
       image_url VARCHAR(500),
       category_id INT,
+      promotion BOOLEAN DEFAULT FALSE,
+      views INT DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
