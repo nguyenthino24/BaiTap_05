@@ -1,4 +1,4 @@
-const { pool } = require('./user'); // Sử dụng pool từ models/user.js
+const { pool } = require('./user');
 const esClient = require('../config/elasticsearch');
 
 // Khởi tạo bảng products
@@ -26,12 +26,11 @@ async function initializeProductTable() {
   }
 }
 
-// Khởi tạo bảng khi module được tải
-initializeProductTable();
-
+// Khởi tạo dữ liệu mẫu và đồng bộ với Elasticsearch
 async function initializeSampleData() {
   try {
     const [rows] = await pool.query('SELECT COUNT(*) as count FROM products');
+    console.log('Current product count in MySQL:', rows[0].count);
     if (rows[0].count === 0) {
       const insertQuery = `
         INSERT INTO products (name, brand, price, image_url, category_id) VALUES
@@ -42,12 +41,48 @@ async function initializeSampleData() {
       `;
       await pool.query(insertQuery);
       console.log('✅ Đã thêm dữ liệu mẫu cho bảng products.');
+
+      const [newProducts] = await pool.query('SELECT * FROM products');
+      for (const product of newProducts) {
+        console.log('Syncing product:', product);
+        const [categoryRows] = await pool.query("SELECT name AS category_name FROM categories WHERE id = ?", [product.category_id]);
+        if (categoryRows.length === 0) {
+          console.error(`❌ Không tìm thấy category với id ${product.category_id} cho product ${product.name}`);
+          continue;
+        }
+        const category_name = categoryRows[0].name;
+
+        await esClient.index({
+          index: 'products',
+          id: product.id.toString(),
+          body: {
+            id: product.id,
+            name: product.name,
+            brand: product.brand,
+            price: parseFloat(product.price),
+            image_url: product.image_url,
+            category_id: parseInt(product.category_id),
+            category_name,
+            promotion: product.promotion || false,
+            views: product.views || 0
+          }
+        });
+        console.log(`✅ Đã đồng bộ product ${product.name} vào Elasticsearch.`);
+      }
+      console.log('✅ Đã đồng bộ dữ liệu mẫu vào Elasticsearch.');
+    } else {
+      console.log('Dữ liệu mẫu đã tồn tại trong MySQL, bỏ qua chèn mới.');
     }
   } catch (error) {
     console.error('❌ Lỗi khi thêm dữ liệu mẫu products:', error.message);
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      console.error('Lỗi do bảng categories hoặc products không tồn tại.');
+    }
   }
 }
 
+// Khởi tạo bảng và dữ liệu khi module được tải
+initializeProductTable();
 initializeSampleData();
 
 async function getAllProducts() {
@@ -65,6 +100,26 @@ async function createProduct(name, brand, price, image_url, category_id) {
      VALUES (?, ?, ?, ?, ?)`,
     [name, brand, price, image_url, category_id]
   );
+
+  const [categoryRows] = await pool.query("SELECT name AS category_name FROM categories WHERE id = ?", [category_id]);
+  const category_name = categoryRows[0]?.category_name || null;
+
+  await esClient.index({
+    index: 'products',
+    id: result.insertId.toString(),
+    body: {
+      id: result.insertId,
+      name,
+      brand,
+      price: parseFloat(price),
+      image_url,
+      category_id: parseInt(category_id),
+      category_name,
+      promotion: false,
+      views: 0
+    }
+  });
+
   return { id: result.insertId, name, brand, price, image_url, category_id };
 }
 

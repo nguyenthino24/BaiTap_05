@@ -1,4 +1,3 @@
-// controllers/productController.js
 const Product = require("../models/product");
 const esClient = require("../config/elasticsearch");
 
@@ -39,44 +38,47 @@ exports.getProductsWithCategories = async (req, res) => {
 exports.searchProducts = async (req, res) => {
   try {
     const { query, category, minPrice, maxPrice, promotion, minViews } = req.query;
+    console.log('Request query params:', req.query);
 
     let esQuery = {
       bool: {
-        should: [],
-        minimum_should_match: 1
+        must: query ? [{
+          multi_match: {
+            query: query.toLowerCase(), // Chuyển thành chữ thường để khớp 'iPhone 15'
+            fields: ["name^3", "brand", "category_name"],
+            fuzziness: "AUTO"
+          }
+        }] : [{ match_all: {} }],
+        filter: []
       }
     };
 
-    if (query) {
-      esQuery.bool.should.push({
-        multi_match: {
-          query: query,
-          fields: ["name^3", "brand", "category_name"],
-          fuzziness: "AUTO"
-        }
-      });
-    }
-
-    // Thay đổi từ filter sang should để sử dụng OR logic
-    if (category) esQuery.bool.should.push({ term: { category_id: parseInt(category) } });
+    if (category) esQuery.bool.filter.push({ term: { category_id: parseInt(category) } });
     if (minPrice || maxPrice) {
       let range = {};
       if (minPrice) range.gte = parseFloat(minPrice);
       if (maxPrice) range.lte = parseFloat(maxPrice);
-      esQuery.bool.should.push({ range: { price: range } });
+      esQuery.bool.filter.push({ range: { price: range } });
     }
-    if (promotion !== undefined) esQuery.bool.should.push({ term: { promotion: promotion === "true" } });
-    if (minViews) esQuery.bool.should.push({ range: { views: { gte: parseInt(minViews) } } });
+    if (promotion !== undefined) esQuery.bool.filter.push({ term: { promotion: promotion === "true" } });
+    if (minViews) esQuery.bool.filter.push({ range: { views: { gte: parseInt(minViews) } } });
 
-    const { body } = await esClient.search({
+    console.log('ES Query (full):', JSON.stringify(esQuery, null, 2));
+    const response = await esClient.search({
       index: "products",
       body: { query: esQuery }
     });
 
-    const hits = body.hits.hits.map(hit => hit._source);
+    console.log('Full Elasticsearch response:', response);
+    const hits = response.hits ? response.hits.hits.map(hit => hit._source) : []; // Sửa cách truy cập hits
+    console.log('Search response:', response.hits);
+    console.log('Search results:', hits);
     res.json(hits);
   } catch (error) {
     console.error("❌ Lỗi khi tìm kiếm sản phẩm:", error.message);
+    if (error.meta && error.meta.body) {
+      console.error('Elasticsearch error details:', error.meta.body);
+    }
     res.status(500).json({ message: "Lỗi server" });
   }
 };

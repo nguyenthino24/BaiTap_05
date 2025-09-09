@@ -37,7 +37,7 @@ const searchProductsApi = async (params = {}) => {
   try {
     const URL_API = '/v1/api/products/search'; // Đảm bảo khớp với /products/search
     const response = await axios.get(URL_API, { params });
-    return response.data;
+    return response; // Fix: return response directly, not response.data
   } catch (error) {
     console.error('API search error:', error.response?.data || error.message);
     throw error;

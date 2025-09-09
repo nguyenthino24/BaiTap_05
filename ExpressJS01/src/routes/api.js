@@ -1,8 +1,8 @@
 // routes/api.js
 const express = require('express');
 const { createUser, handleLogin, getUser, getAccount } = require('../controllers/userController');
-const productRoutes = require('./product');
 const categoryRoutes = require('./category');
+const productRoutes = require('./product');
 const auth = require('../middleware/auth');
 const delay = require('../middleware/delay');
 

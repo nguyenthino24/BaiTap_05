@@ -11,33 +11,54 @@ const HomePage = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
-  const [searchForm, setSearchForm] = useState({
-    query: '',
-    category: '',
-    minPrice: '',
-    maxPrice: '',
-    promotion: false,
-    minViews: ''
-  });
+  const [form] = Form.useForm(); // ✅ dùng instance form để reset
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [productResponse, categoryResponse] = await Promise.all([
+        axios.get('/v1/api/products/with-category'),
+        axios.get('/v1/api/categories')
+      ]);
+      setProducts(Array.isArray(productResponse) ? productResponse : []);
+      setCategories(Array.isArray(categoryResponse) ? categoryResponse : []);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [productResponse, categoryResponse] = await Promise.all([
-          axios.get('/v1/api/products/with-category'),
-          axios.get('/v1/api/categories')
-        ]);
-        setProducts(Array.isArray(productResponse) ? productResponse : []);
-        setCategories(Array.isArray(categoryResponse) ? categoryResponse : []);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, []);
+
+  const handleSearch = async (values) => {
+    setSearching(true);
+    try {
+      const params = {
+        query: values.query || '',
+        category: values.category ? parseInt(values.category) : undefined,
+        minPrice: values.minPrice ? parseFloat(values.minPrice) : undefined,
+        maxPrice: values.maxPrice ? parseFloat(values.maxPrice) : undefined,
+        promotion: values.promotion ? "true" : undefined,
+        minViews: values.minViews ? parseInt(values.minViews) : undefined
+      };
+
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([_, v]) => v !== undefined)
+      );
+
+      const response = await searchProductsApi(filteredParams);
+      const productsArray = Array.isArray(response) ? response : [];
+      setProducts(productsArray);
+    } catch (error) {
+      console.error('❌ Search error:', error);
+      console.error('❌ Error details:', error.response?.data || error.message);
+    } finally {
+      setSearching(false);
+    }
+  };
 
   return (
     <div style={{ padding: 20 }}>
@@ -49,27 +70,17 @@ const HomePage = () => {
       <div style={{ marginTop: 20 }}>
         <h2>Tìm kiếm sản phẩm</h2>
         <Form
+          form={form}
           layout="vertical"
-          onFinish={async (values) => {
-            setSearching(true);
-            try {
-              const params = {
-                query: values.query,
-                category: values.category,
-                minPrice: values.minPrice,
-                maxPrice: values.maxPrice,
-                promotion: values.promotion,
-                minViews: values.minViews
-              };
-              const response = await searchProductsApi(params);
-              setProducts(Array.isArray(response) ? response : []);
-            } catch (error) {
-              console.error('Search error:', error);
-            } finally {
-              setSearching(false);
-            }
+          onFinish={handleSearch}
+          initialValues={{
+            query: '',
+            category: null,
+            minPrice: '',
+            maxPrice: '',
+            promotion: false,
+            minViews: ''
           }}
-          initialValues={searchForm}
         >
           <Row gutter={16}>
             <Col span={6}>
@@ -117,19 +128,8 @@ const HomePage = () => {
               <Button
                 htmlType="button"
                 onClick={() => {
-                  setSearchForm({
-                    query: '',
-                    category: '',
-                    minPrice: '',
-                    maxPrice: '',
-                    promotion: false,
-                    minViews: ''
-                  });
-                  setLoading(true);
-                  axios.get('/v1/api/products/with-category').then((res) => {
-                    setProducts(Array.isArray(res) ? res : []);
-                    setLoading(false);
-                  });
+                  form.resetFields(); // ✅ reset form về mặc định
+                  fetchData(); // ✅ gọi lại trang home ban đầu
                 }}
               >
                 Đặt lại
@@ -139,20 +139,38 @@ const HomePage = () => {
         </Form>
       </div>
       <div style={{ marginTop: 20 }}>
-        <h2>Sản phẩm nổi bật</h2>
-        {loading ? (
+        <h2>Sản phẩm</h2>
+        {loading || searching ? (
           <Spin size="large" />
+        ) : products.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <p>Không tìm thấy sản phẩm nào phù hợp với tiêu chí tìm kiếm.</p>
+          </div>
         ) : (
           <Row gutter={16}>
-            {products.slice(0, 6).map((product) => (
+            {products.map((product) => (
               <Col span={8} key={product.id}>
                 <Card
                   hoverable
-                  cover={product.image_url ? <img alt={product.name} src={product.image_url} /> : null}
+                  cover={product.image_url ? <img alt={product.name} src={product.image_url} style={{ height: 200, objectFit: 'cover' }} /> : null}
                 >
                   <Card.Meta
                     title={product.name}
-                    description={`${product.price} VND - ${product.category_name || 'Chưa có danh mục'}`}
+                    description={
+                      <div>
+                        <div style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                          {new Intl.NumberFormat('vi-VN').format(product.price)} VND
+                        </div>
+                        <div style={{ color: '#666' }}>
+                          {product.category_name || 'Chưa có danh mục'}
+                        </div>
+                        {product.promotion && (
+                          <div style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
+                            🔴 Khuyến mãi
+                          </div>
+                        )}
+                      </div>
+                    }
                   />
                 </Card>
               </Col>
