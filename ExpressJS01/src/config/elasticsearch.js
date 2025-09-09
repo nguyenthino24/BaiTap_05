@@ -20,6 +20,8 @@ async function initializeElasticsearch() {
               name: { type: 'text' },
               brand: { type: 'text' },
               price: { type: 'float' },
+              original_price: { type: 'float' },
+              discount_percentage: { type: 'integer' },
               image_url: { type: 'keyword' },
               category_id: { type: 'integer' },
               category_name: { type: 'text' },

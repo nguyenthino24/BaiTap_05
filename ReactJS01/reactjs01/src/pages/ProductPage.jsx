@@ -1,31 +1,42 @@
 import React, { useState, useEffect } from 'react';
+import { SearchOutlined, CrownOutlined } from '@ant-design/icons';
+import { Result, Button, Spin, Card, Row, Col, Input, Select, Form, Space, Checkbox, message } from 'antd';
 import axios from '../util/axios.customize.js';
 import { searchProductsApi } from '../util/api.js';
 
 const ProductPage = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [formData, setFormData] = useState({
-    name: '',
-    brand: '',
-    price: '',
-    image_url: '',
-    category_id: ''
-  });
-  const [searchForm, setSearchForm] = useState({
-    query: '',
-    category: '',
-    minPrice: '',
-    maxPrice: '',
-    promotion: '',
-    minViews: ''
-  });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [form] = Form.useForm();
+  const [addForm] = Form.useForm();
 
-  // Hàm fetch dữ liệu
+  // Tự động tính phần trăm giảm giá
+  const calculateDiscountPercentage = (originalPrice, currentPrice) => {
+    if (originalPrice && currentPrice && originalPrice > currentPrice) {
+      return Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+    }
+    return 0;
+  };
+
+  // Xử lý khi giá thay đổi
+  const handlePriceChange = () => {
+    const values = addForm.getFieldsValue();
+    if (values.original_price && values.price && values.original_price > values.price) {
+      const discountPercent = calculateDiscountPercentage(values.original_price, values.price);
+      addForm.setFieldsValue({
+        discount_percentage: discountPercent,
+        promotion: true
+      });
+    } else if (!values.original_price) {
+      addForm.setFieldsValue({
+        discount_percentage: 0,
+        promotion: false
+      });
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -33,421 +44,231 @@ const ProductPage = () => {
         axios.get('/v1/api/products/with-category'),
         axios.get('/v1/api/categories')
       ]);
-
-      // Do axios instance trả trực tiếp data rồi → dùng luôn
       setProducts(Array.isArray(productResponse) ? productResponse : []);
       setCategories(Array.isArray(categoryResponse) ? categoryResponse : []);
     } catch (err) {
-      console.error('API error:', err);
-      setError('Lỗi khi tải dữ liệu: ' + (err.message || 'Unknown error'));
+      message.error('Lỗi khi tải dữ liệu: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
   };
 
-  // Gọi fetchData khi component mount
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Xử lý thay đổi input trong form
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  // Xử lý submit form để thêm sản phẩm
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-
+  const handleAddProduct = async (values) => {
     try {
-      const response = await axios.post('/v1/api/products', formData);
-      setSuccess(response.message); // response đã là data
-
-      // Fetch lại dữ liệu sau khi thêm thành công
-      await fetchData();
-
-      // Reset form
-      setFormData({ name: '', brand: '', price: '', image_url: '', category_id: '' });
+      const response = await axios.post('/v1/api/products', values);
+      message.success(response.message || 'Thêm sản phẩm thành công!');
+      addForm.resetFields();
+      fetchData();
     } catch (err) {
-      console.error('Submit error:', err);
-      setError(err.message || 'Lỗi khi thêm sản phẩm');
+      console.error(err);
+      message.error('Lỗi khi thêm sản phẩm');
     }
   };
 
-  // Xử lý thay đổi input trong search form
-  const handleSearchChange = (e) => {
-    const { name, value } = e.target;
-    setSearchForm({ ...searchForm, [name]: value });
-  };
-
-  // Xử lý tìm kiếm
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const handleSearch = async (values) => {
     setSearching(true);
-    setError('');
-
     try {
-      const params = {};
-      if (searchForm.query) params.query = searchForm.query;
-      if (searchForm.category) params.category = searchForm.category;
-      if (searchForm.minPrice) params.minPrice = searchForm.minPrice;
-      if (searchForm.maxPrice) params.maxPrice = searchForm.maxPrice;
-      if (searchForm.promotion) params.promotion = searchForm.promotion;
-      if (searchForm.minViews) params.minViews = searchForm.minViews;
-
-      const response = await searchProductsApi(params);
+      const params = {
+        query: values.query || '',
+        category: values.category ? parseInt(values.category) : undefined,
+        minPrice: values.minPrice ? parseFloat(values.minPrice) : undefined,
+        maxPrice: values.maxPrice ? parseFloat(values.maxPrice) : undefined,
+        promotion: values.promotion ? 'true' : undefined,
+        minViews: values.minViews ? parseInt(values.minViews) : undefined
+      };
+      const filteredParams = Object.fromEntries(
+        Object.entries(params).filter(([_, v]) => v !== undefined)
+      );
+      const response = await searchProductsApi(filteredParams);
       setProducts(Array.isArray(response) ? response : []);
     } catch (err) {
-      console.error('Search error:', err);
-      setError('Lỗi khi tìm kiếm: ' + (err.message || 'Unknown error'));
+      console.error(err);
+      message.error('Lỗi khi tìm kiếm');
     } finally {
       setSearching(false);
     }
   };
 
-  // Reset search
-  const handleResetSearch = () => {
-    setSearchForm({
-      query: '',
-      category: '',
-      minPrice: '',
-      maxPrice: '',
-      promotion: '',
-      minViews: ''
-    });
-    fetchData();
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="container mx-auto p-6">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-            🛍️ Quản Lý Sản Phẩm
-          </h1>
-          <p className="text-gray-600">Quản lý và tìm kiếm sản phẩm của bạn</p>
-        </div>
+    <div style={{ padding: 20 }}>
+      <Result
+        icon={<CrownOutlined />}
+        title="Trang Quản Lý Sản Phẩm"
+      />
 
-        {/* Form thêm sản phẩm */}
-        <div className="mb-8 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-6">
-            <h2 className="text-2xl font-bold text-white flex items-center">
-              <span className="mr-2">➕</span> Thêm Sản Phẩm Mới
-            </h2>
-          </div>
-          <div className="p-6">
-            {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center">
-                <span className="text-red-500 mr-2">⚠️</span>
-                <p className="text-red-700">{error}</p>
-              </div>
-            )}
-            {success && (
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center">
-                <span className="text-green-500 mr-2">✅</span>
-                <p className="text-green-700">{success}</p>
-              </div>
-            )}
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">📦 Tên sản phẩm</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="Nhập tên sản phẩm"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">🏷️ Thương hiệu</label>
-                <input
-                  type="text"
-                  name="brand"
-                  value={formData.brand}
-                  onChange={handleInputChange}
-                  placeholder="Nhập thương hiệu"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">💰 Giá (VND)</label>
-                <input
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  placeholder="Nhập giá sản phẩm"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">🖼️ URL hình ảnh</label>
-                <input
-                  type="text"
-                  name="image_url"
-                  value={formData.image_url}
-                  onChange={handleInputChange}
-                  placeholder="Nhập URL hình ảnh"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">📂 Danh mục</label>
-                <select
-                  name="category_id"
-                  value={formData.category_id}
-                  onChange={handleInputChange}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                  required
-                >
-                  <option value="">Chọn danh mục sản phẩm</option>
-                  {categories.length > 0 ? (
-                    categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>Không có danh mục nào</option>
-                  )}
-                </select>
-              </div>
-              <div className="md:col-span-2 flex justify-center">
-                <button
-                  type="submit"
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading || categories.length === 0}
-                >
-                  {loading ? '⏳ Đang xử lý...' : '✨ Thêm Sản Phẩm'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Form thêm sản phẩm */}
+      <div style={{ marginTop: 20 }}>
+        <h2>Thêm sản phẩm mới</h2>
+        <Form
+          layout="vertical"
+          form={addForm}
+          onFinish={handleAddProduct}
+        >
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item name="name" label="Tên sản phẩm" rules={[{ required: true, message: 'Vui lòng nhập tên sản phẩm' }]}>
+                <Input placeholder="Nhập tên sản phẩm" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="brand" label="Thương hiệu" rules={[{ required: true, message: 'Vui lòng nhập thương hiệu' }]}>
+                <Input placeholder="Nhập thương hiệu" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="price" label="Giá hiện tại (VND)" rules={[{ required: true, message: 'Vui lòng nhập giá' }]}>
+                <Input type="number" placeholder="Nhập giá hiện tại" onChange={handlePriceChange} />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="original_price" label="Giá gốc (VND)">
+                <Input type="number" placeholder="Nhập giá gốc (nếu có khuyến mãi)" onChange={handlePriceChange} />
+              </Form.Item>
+            </Col>
 
-        {/* Form tìm kiếm sản phẩm */}
-        <div className="mb-8 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-green-500 to-teal-600 p-6">
-            <h2 className="text-2xl font-bold text-white flex items-center">
-              <span className="mr-2">🔍</span> Tìm Kiếm Sản Phẩm
-            </h2>
-          </div>
-          <div className="p-6">
-            <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">🔤 Từ khóa</label>
-                <input
-                  type="text"
-                  name="query"
-                  value={searchForm.query}
-                  onChange={handleSearchChange}
-                  placeholder="Nhập từ khóa tìm kiếm"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">📂 Danh mục</label>
-                <select
-                  name="category"
-                  value={searchForm.category}
-                  onChange={handleSearchChange}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-                >
-                  <option value="">Tất cả danh mục</option>
-                  {categories.length > 0 ? (
-                    categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>Không có danh mục nào</option>
-                  )}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">💰 Giá tối thiểu</label>
-                <input
-                  type="number"
-                  name="minPrice"
-                  value={searchForm.minPrice}
-                  onChange={handleSearchChange}
-                  placeholder="0"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">💰 Giá tối đa</label>
-                <input
-                  type="number"
-                  name="maxPrice"
-                  value={searchForm.maxPrice}
-                  onChange={handleSearchChange}
-                  placeholder="Không giới hạn"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">🏷️ Khuyến mãi</label>
-                <select
-                  name="promotion"
-                  value={searchForm.promotion}
-                  onChange={handleSearchChange}
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-                >
-                  <option value="">Tất cả</option>
-                  <option value="true">Có khuyến mãi</option>
-                  <option value="false">Không khuyến mãi</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">👁️ Lượt xem tối thiểu</label>
-                <input
-                  type="number"
-                  name="minViews"
-                  value={searchForm.minViews}
-                  onChange={handleSearchChange}
-                  placeholder="0"
-                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-                />
-              </div>
-              <div className="md:col-span-2 lg:col-span-3 flex gap-4 justify-center">
-                <button
-                  type="submit"
-                  className="bg-gradient-to-r from-green-500 to-teal-600 text-white px-8 py-3 rounded-xl hover:from-green-600 hover:to-teal-700 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={searching}
-                >
-                  {searching ? '⏳ Đang tìm...' : '🔍 Tìm Kiếm'}
-                </button>
-                <button
-                  type="button"
-                  className="bg-gradient-to-r from-gray-400 to-gray-500 text-white px-8 py-3 rounded-xl hover:from-gray-500 hover:to-gray-600 transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={handleResetSearch}
-                  disabled={searching}
-                >
-                  🔄 Đặt Lại
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        {/* Loading States */}
-        {(loading || searching) && (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center px-6 py-3 bg-white rounded-full shadow-lg">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mr-3"></div>
-              <span className="text-gray-600 font-medium">
-                {loading ? '⏳ Đang tải sản phẩm...' : '🔍 Đang tìm kiếm...'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && !loading && !searching && (
-          <div className="max-w-md mx-auto mb-8 p-6 bg-red-50 border border-red-200 rounded-2xl">
-            <div className="flex items-center">
-              <span className="text-2xl mr-3">⚠️</span>
-              <div>
-                <h3 className="text-red-800 font-semibold">Có lỗi xảy ra</h3>
-                <p className="text-red-600 mt-1">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Product List */}
-        {!loading && !error && (
-          <div className="space-y-6">
-            {products.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="text-6xl mb-4">📦</div>
-                <h3 className="text-xl font-semibold text-gray-600 mb-2">Chưa có sản phẩm nào</h3>
-                <p className="text-gray-500">Hãy thêm sản phẩm đầu tiên của bạn!</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    📋 Danh sách sản phẩm ({products.length})
-                  </h2>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                  {products.map((product) => (
-                    <div
-                      key={product.id}
-                      className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100 overflow-hidden"
-                    >
-                      {/* Product Image */}
-                      <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-4xl text-gray-400">
-                            📦
-                          </div>
-                        )}
-                        {/* Promotion Badge */}
-                        {product.promotion && (
-                          <div className="absolute top-3 right-3 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                            🔥 Khuyến mãi
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Product Info */}
-                      <div className="p-6">
-                        <h3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                          {product.name}
-                        </h3>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center text-gray-600">
-                            <span className="mr-2">🏷️</span>
-                            <span className="font-medium">{product.brand}</span>
-                          </div>
-
-                          <div className="flex items-center text-gray-600">
-                            <span className="mr-2">📂</span>
-                            <span>{product.category_name || 'Chưa có danh mục'}</span>
-                          </div>
-
-                          <div className="flex items-center text-gray-600">
-                            <span className="mr-2">👁️</span>
-                            <span>{product.views || 0} lượt xem</span>
-                          </div>
-                        </div>
-
-                        {/* Price */}
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <div className="text-2xl font-bold text-green-600">
-                            {new Intl.NumberFormat('vi-VN', {
-                              style: 'currency',
-                              currency: 'VND'
-                            }).format(product.price)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+            <Col span={12}>
+              <Form.Item name="image_url" label="URL hình ảnh">
+                <Input placeholder="Nhập URL hình ảnh" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="category_id" label="Danh mục" rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}>
+                <Select placeholder="Chọn danh mục">
+                  {categories.map((c) => (
+                    <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>
                   ))}
-                </div>
-              </>
-            )}
-          </div>
+                </Select>
+              </Form.Item>
+            </Col>
+            {/* Hidden fields for automatic values */}
+            <Form.Item name="discount_percentage" style={{ display: 'none' }}>
+              <Input type="hidden" />
+            </Form.Item>
+            <Form.Item name="promotion" style={{ display: 'none' }}>
+              <Input type="hidden" />
+            </Form.Item>
+          </Row>
+          <Button type="primary" htmlType="submit">Thêm sản phẩm</Button>
+        </Form>
+      </div>
+
+      {/* Form tìm kiếm */}
+      <div style={{ marginTop: 40 }}>
+        <h2>Tìm kiếm sản phẩm</h2>
+        <Form
+          layout="vertical"
+          form={form}
+          onFinish={handleSearch}
+          initialValues={{
+            query: '',
+            category: null,
+            minPrice: '',
+            maxPrice: '',
+            promotion: false,
+            minViews: ''
+          }}
+        >
+          <Row gutter={16}>
+            <Col span={6}>
+              <Form.Item name="query" label="Từ khóa">
+                <Input placeholder="Nhập từ khóa" prefix={<SearchOutlined />} />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="category" label="Danh mục">
+                <Select placeholder="Chọn danh mục" allowClear>
+                  {categories.map((c) => (
+                    <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="minPrice" label="Giá tối thiểu">
+                <Input type="number" placeholder="0" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="maxPrice" label="Giá tối đa">
+                <Input type="number" placeholder="Không giới hạn" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="promotion" valuePropName="checked" label="Có khuyến mãi">
+                <Checkbox />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="minViews" label="Lượt xem tối thiểu">
+                <Input type="number" placeholder="0" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={searching}>Tìm kiếm</Button>
+            <Button
+              onClick={() => {
+                form.resetFields();
+                fetchData();
+              }}
+            >
+              Đặt lại
+            </Button>
+          </Space>
+        </Form>
+      </div>
+
+      {/* Danh sách sản phẩm */}
+      <div style={{ marginTop: 40 }}>
+        <h2>{products.length} sản phẩm</h2>
+        {loading || searching ? (
+          <Spin size="large" />
+        ) : (
+          <Row gutter={16}>
+            {products.map((p) => (
+              <Col span={8} key={p.id}>
+                <Card
+                  hoverable
+                  cover={p.image_url ? <img src={p.image_url} alt={p.name} style={{ height: 200, objectFit: 'cover' }} /> : null}
+                >
+                  <Card.Meta
+                    title={p.name}
+                    description={
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#1890ff', fontSize: '16px' }}>
+                            {new Intl.NumberFormat('vi-VN').format(p.price)} VND
+                          </span>
+                          {p.original_price && p.discount_percentage > 0 && (
+                            <>
+                              <span style={{ textDecoration: 'line-through', color: '#999', fontSize: '14px' }}>
+                                {new Intl.NumberFormat('vi-VN').format(p.original_price)} VND
+                              </span>
+                              <span style={{ backgroundColor: '#ff4d4f', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                                -{p.discount_percentage}%
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <div style={{ color: '#666', marginTop: '4px' }}>
+                          {p.category_name || 'Chưa có danh mục'}
+                        </div>
+                        {p.promotion && (
+                          <div style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: '14px', marginTop: '4px' }}>
+                            🔥 Khuyến mãi hot
+                          </div>
+                        )}
+                      </div>
+                    }
+                  />
+                </Card>
+              </Col>
+            ))}
+          </Row>
         )}
       </div>
     </div>

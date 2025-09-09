@@ -9,6 +9,8 @@ async function initializeProductTable() {
       name VARCHAR(255) NOT NULL,
       brand VARCHAR(255) NOT NULL,
       price DECIMAL(10,2) NOT NULL,
+      original_price DECIMAL(10,2),
+      discount_percentage INT DEFAULT 0,
       image_url VARCHAR(500),
       category_id INT,
       promotion BOOLEAN DEFAULT FALSE,
@@ -33,11 +35,11 @@ async function initializeSampleData() {
     console.log('Current product count in MySQL:', rows[0].count);
     if (rows[0].count === 0) {
       const insertQuery = `
-        INSERT INTO products (name, brand, price, image_url, category_id) VALUES
-        ('iPhone 15', 'Apple', 25000000, 'https://example.com/iphone15.jpg', 1),
-        ('Samsung Galaxy S24', 'Samsung', 20000000, 'https://example.com/galaxy.jpg', 1),
-        ('MacBook Pro', 'Apple', 50000000, 'https://example.com/macbook.jpg', 2),
-        ('Dell XPS 13', 'Dell', 35000000, 'https://example.com/dell.jpg', 2);
+        INSERT INTO products (name, brand, price, original_price, discount_percentage, image_url, category_id, promotion) VALUES
+        ('iPhone 15', 'Apple', 25000000, 28000000, 10, 'https://example.com/iphone15.jpg', 1, true),
+        ('Samsung Galaxy S24', 'Samsung', 20000000, NULL, 0, 'https://example.com/galaxy.jpg', 1, false),
+        ('MacBook Pro', 'Apple', 50000000, 55000000, 9, 'https://example.com/macbook.jpg', 2, true),
+        ('Dell XPS 13', 'Dell', 35000000, NULL, 0, 'https://example.com/dell.jpg', 2, false);
       `;
       await pool.query(insertQuery);
       console.log('✅ Đã thêm dữ liệu mẫu cho bảng products.');
@@ -60,6 +62,8 @@ async function initializeSampleData() {
             name: product.name,
             brand: product.brand,
             price: parseFloat(product.price),
+            original_price: product.original_price ? parseFloat(product.original_price) : null,
+            discount_percentage: product.discount_percentage || 0,
             image_url: product.image_url,
             category_id: parseInt(product.category_id),
             category_name,
@@ -94,11 +98,11 @@ async function getAllProducts() {
   return rows;
 }
 
-async function createProduct(name, brand, price, image_url, category_id) {
+async function createProduct(name, brand, price, original_price, discount_percentage, image_url, category_id, promotion) {
   const [result] = await pool.query(
-    `INSERT INTO products (name, brand, price, image_url, category_id)
-     VALUES (?, ?, ?, ?, ?)`,
-    [name, brand, price, image_url, category_id]
+    `INSERT INTO products (name, brand, price, original_price, discount_percentage, image_url, category_id, promotion)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, brand, price, original_price, discount_percentage, image_url, category_id, promotion]
   );
 
   const [categoryRows] = await pool.query("SELECT name AS category_name FROM categories WHERE id = ?", [category_id]);
@@ -112,28 +116,29 @@ async function createProduct(name, brand, price, image_url, category_id) {
       name,
       brand,
       price: parseFloat(price),
+      original_price: original_price ? parseFloat(original_price) : null,
+      discount_percentage: discount_percentage || 0,
       image_url,
       category_id: parseInt(category_id),
       category_name,
-      promotion: false,
+      promotion: promotion || false,
       views: 0
     }
   });
 
-  return { id: result.insertId, name, brand, price, image_url, category_id };
+  return { id: result.insertId, name, brand, price, original_price, discount_percentage, image_url, category_id, promotion };
 }
 
 async function getProductsWithCategories() {
   const [rows] = await pool.query(`
-    SELECT p.id, p.name, p.brand, p.price, p.image_url,
-           c.name AS category_name
+    SELECT p.id, p.name, p.brand, p.price, p.original_price, p.discount_percentage,
+           p.image_url, p.promotion, p.views, c.name AS category_name
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     ORDER BY c.name, p.name
   `);
   return rows;
 }
-
 module.exports = {
   getAllProducts,
   createProduct,

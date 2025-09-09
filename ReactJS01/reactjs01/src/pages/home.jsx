@@ -158,15 +158,27 @@ const HomePage = () => {
                     title={product.name}
                     description={
                       <div>
-                        <div style={{ fontWeight: 'bold', color: '#1890ff' }}>
-                          {new Intl.NumberFormat('vi-VN').format(product.price)} VND
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#1890ff', fontSize: '16px' }}>
+                            {new Intl.NumberFormat('vi-VN').format(product.price)} VND
+                          </span>
+                          {product.original_price && product.discount_percentage > 0 && (
+                            <>
+                              <span style={{ textDecoration: 'line-through', color: '#999', fontSize: '14px' }}>
+                                {new Intl.NumberFormat('vi-VN').format(product.original_price)} VND
+                              </span>
+                              <span style={{ backgroundColor: '#ff4d4f', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                                -{product.discount_percentage}%
+                              </span>
+                            </>
+                          )}
                         </div>
-                        <div style={{ color: '#666' }}>
+                        <div style={{ color: '#666', marginTop: '4px' }}>
                           {product.category_name || 'Chưa có danh mục'}
                         </div>
                         {product.promotion && (
-                          <div style={{ color: '#ff4d4f', fontWeight: 'bold' }}>
-                            🔴 Khuyến mãi
+                          <div style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: '14px', marginTop: '4px' }}>
+                            🔥 Khuyến mãi hot
                           </div>
                         )}
                       </div>

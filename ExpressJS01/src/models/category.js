@@ -20,10 +20,11 @@ async function initializeCategoryTable() {
     if (rows[0].count === 0) {
       const insertQuery = `
         INSERT INTO categories (name, description) VALUES
-        ('Điện thoại', 'Các loại điện thoại di động'),
-        ('Laptop', 'Máy tính xách tay'),
-        ('Tablet', 'Máy tính bảng'),
-        ('Phụ kiện', 'Phụ kiện công nghệ');
+        ('Điện tử', 'Các sản phẩm điện tử như điện thoại, máy tính bảng, laptop'),
+        ('Thời trang', 'Quần áo, giày dép và phụ kiện thời trang'),
+        ('Gia dụng', 'Đồ dùng gia đình như máy giặt, tủ lạnh, nồi chiên'),
+        ('Sách', 'Sách giáo khoa, tiểu thuyết, và sách tham khảo');
+        
       `;
       await pool.query(insertQuery);
       console.log('✅ Đã thêm dữ liệu mẫu cho bảng categories.');
