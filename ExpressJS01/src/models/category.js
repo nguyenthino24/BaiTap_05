@@ -24,14 +24,14 @@ async function initializeCategoryTable() {
         ('Thời trang', 'Quần áo, giày dép và phụ kiện thời trang'),
         ('Gia dụng', 'Đồ dùng gia đình như máy giặt, tủ lạnh, nồi chiên'),
         ('Sách', 'Sách giáo khoa, tiểu thuyết, và sách tham khảo');
-        
+
       `;
       await pool.query(insertQuery);
       console.log('✅ Đã thêm dữ liệu mẫu cho bảng categories.');
     }
   } catch (error) {
     console.error('❌ Lỗi khi tạo bảng categories:', error.message);
-    throw error; // Ném lỗi để backend báo rõ
+    throw error; 
   }
 }
 

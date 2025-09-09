@@ -13,11 +13,11 @@ exports.getAllProducts = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
   try {
-    const { name, brand, price, image_url, category_id } = req.body;
+    const { name, brand, price, original_price, discount_percentage, image_url, category_id, promotion } = req.body;
     if (!name || !brand || !price) {
       return res.status(400).json({ message: "Thiếu thông tin sản phẩm" });
     }
-    const product = await Product.createProduct(name, brand, price, image_url, category_id);
+    const product = await Product.createProduct(name, brand, price, original_price, discount_percentage, image_url, category_id, promotion);
     res.status(201).json({ message: "✅ Sản phẩm đã được thêm", product });
   } catch (error) {
     console.error("❌ Lỗi khi thêm sản phẩm:", error.message);
@@ -37,14 +37,21 @@ exports.getProductsWithCategories = async (req, res) => {
 
 exports.searchProducts = async (req, res) => {
   try {
-    const { query, category, minPrice, maxPrice, promotion, minViews } = req.query;
+    const { query, category, minPrice, maxPrice, promotion, minViews, source } = req.query;
     console.log('Request query params:', req.query);
 
+    if (source === 'mysql') {
+      // Use MySQL search
+      const results = await Product.searchProductsMySQL({ query, category, minPrice, maxPrice, promotion, minViews });
+      return res.json(results);
+    }
+
+    // Default to Elasticsearch search
     let esQuery = {
       bool: {
         must: query ? [{
           multi_match: {
-            query: query.toLowerCase(), // Chuyển thành chữ thường để khớp 'iPhone 15'
+            query: query.toLowerCase(),
             fields: ["name^3", "brand", "category_name"],
             fuzziness: "AUTO"
           }
@@ -70,7 +77,7 @@ exports.searchProducts = async (req, res) => {
     });
 
     console.log('Full Elasticsearch response:', response);
-    const hits = response.hits ? response.hits.hits.map(hit => hit._source) : []; // Sửa cách truy cập hits
+    const hits = response.hits ? response.hits.hits.map(hit => hit._source) : [];
     console.log('Search response:', response.hits);
     console.log('Search results:', hits);
     res.json(hits);

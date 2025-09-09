@@ -32,11 +32,13 @@ const getAllCategoriesApi = () => {
   return axios.get(URL_API);
 };
 
-// Thêm API tìm kiếm sản phẩm với filter
+// Thêm API tìm kiếm sản phẩm với filter (sử dụng MySQL)
 const searchProductsApi = async (params = {}) => {
   try {
     const URL_API = '/v1/api/products/search'; // Đảm bảo khớp với /products/search
-    const response = await axios.get(URL_API, { params });
+    // Thêm source=mysql để sử dụng MySQL thay vì Elasticsearch
+    const searchParams = { ...params, source: 'mysql' };
+    const response = await axios.get(URL_API, { params: searchParams });
     return response; // Fix: return response directly, not response.data
   } catch (error) {
     console.error('API search error:', error.response?.data || error.message);

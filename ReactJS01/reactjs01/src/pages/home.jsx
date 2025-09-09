@@ -65,7 +65,7 @@ const HomePage = () => {
       <Result
         icon={<CrownOutlined />}
         title="50M Web Token (React/NodeJS) - iotstar.vn"
-        extra={<Button type="primary" onClick={() => navigate('/products')}>Xem sản phẩm</Button>}
+        extra={<Button type="primary" onClick={() => navigate('/products')}>Quản lý sản phẩm</Button>}
       />
       <div style={{ marginTop: 20 }}>
         <h2>Tìm kiếm sản phẩm</h2>

@@ -139,8 +139,63 @@ async function getProductsWithCategories() {
   `);
   return rows;
 }
+
+async function searchProductsMySQL({ query, category, minPrice, maxPrice, promotion, minViews }) {
+  let sql = `
+    SELECT p.id, p.name, p.brand, p.price, p.original_price, p.discount_percentage,
+           p.image_url, p.promotion, p.views, c.name AS category_name
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  // Search query (name, brand, category_name)
+  if (query) {
+    sql += ` AND (p.name LIKE ? OR p.brand LIKE ? OR c.name LIKE ?)`;
+    const searchTerm = `%${query}%`;
+    params.push(searchTerm, searchTerm, searchTerm);
+  }
+
+  // Category filter
+  if (category) {
+    sql += ` AND p.category_id = ?`;
+    params.push(parseInt(category));
+  }
+
+  // Price range filter
+  if (minPrice || maxPrice) {
+    if (minPrice) {
+      sql += ` AND p.price >= ?`;
+      params.push(parseFloat(minPrice));
+    }
+    if (maxPrice) {
+      sql += ` AND p.price <= ?`;
+      params.push(parseFloat(maxPrice));
+    }
+  }
+
+  // Promotion filter
+  if (promotion !== undefined) {
+    sql += ` AND p.promotion = ?`;
+    params.push(promotion === 'true');
+  }
+
+  // Minimum views filter
+  if (minViews) {
+    sql += ` AND p.views >= ?`;
+    params.push(parseInt(minViews));
+  }
+
+  sql += ` ORDER BY p.name`;
+
+  const [rows] = await pool.query(sql, params);
+  return rows;
+}
+
 module.exports = {
   getAllProducts,
   createProduct,
-  getProductsWithCategories
+  getProductsWithCategories,
+  searchProductsMySQL
 };
