@@ -1,5 +1,6 @@
 const Product = require("../models/product");
 const esClient = require("../config/elasticsearch");
+const { pool } = require("../models/user");
 
 exports.getAllProducts = async (req, res) => {
   try {
@@ -86,6 +87,32 @@ exports.searchProducts = async (req, res) => {
     if (error.meta && error.meta.body) {
       console.error('Elasticsearch error details:', error.meta.body);
     }
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+exports.getProductsPaginated = async (req, res) => {
+  try {
+    const { page = 1, limit = 9 } = req.query; // mặc định 9 sp / trang
+    const offset = (page - 1) * limit;
+
+    const [rows] = await pool.query(`
+      SELECT p.*, c.name AS category_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [parseInt(limit), parseInt(offset)]);
+
+    const [countRows] = await pool.query(`SELECT COUNT(*) as total FROM products`);
+    const total = countRows[0].total;
+
+    res.json({
+      products: rows,
+      total,
+      hasMore: page * limit < total
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi phân trang sản phẩm:", error.message);
     res.status(500).json({ message: "Lỗi server" });
   }
 };

@@ -192,10 +192,45 @@ async function searchProductsMySQL({ query, category, minPrice, maxPrice, promot
   const [rows] = await pool.query(sql, params);
   return rows;
 }
+async function getProductsPaginated({ categoryId, page = 1, limit = 10 }) {
+  const offset = (page - 1) * limit;
+  let sql = `
+    SELECT p.*, c.name AS category_name
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+  `;
+  const params = [];
+
+  if (categoryId) {
+    sql += ` WHERE p.category_id = ?`;
+    params.push(categoryId);
+  }
+
+  sql += ` ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
+
+  const [rows] = await pool.query(sql, params);
+
+  // Đếm tổng sản phẩm để biết còn load tiếp không
+  let countSql = `SELECT COUNT(*) as total FROM products`;
+  if (categoryId) {
+    countSql += ` WHERE category_id = ?`;
+  }
+  const [countRows] = await pool.query(countSql, categoryId ? [categoryId] : []);
+  const total = countRows[0].total;
+
+  return {
+    products: rows,
+    total,
+    hasMore: page * limit < total
+  };
+}
 
 module.exports = {
   getAllProducts,
   createProduct,
   getProductsWithCategories,
-  searchProductsMySQL
+  searchProductsMySQL,
+  getProductsPaginated
 };
+
