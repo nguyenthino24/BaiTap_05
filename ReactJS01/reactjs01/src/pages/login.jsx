@@ -16,6 +16,7 @@ const LoginPage = () => {
 
     if (res && res.access_token) {
       localStorage.setItem("access_token", res.access_token);
+      localStorage.setItem("user", JSON.stringify(res.user));
       notification.success({
         message: "LOGIN USER",
         description: "Success"
@@ -23,10 +24,7 @@ const LoginPage = () => {
 
       setAuth({
         isAuthenticated: true,
-        user: {
-          email: res?.user?.email ?? "",
-          name: res?.user?.name ?? ""
-        }
+        user: res.user
       });
 
       navigate("/");

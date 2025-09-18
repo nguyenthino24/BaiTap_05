@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { UsergroupAddOutlined, HomeOutlined, SettingOutlined } from '@ant-design/icons';
 import { Menu } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,6 +7,9 @@ import { AuthContext } from '../context/auth.context';
 const Header = () => {
   const navigate = useNavigate();
   const { auth, setAuth } = useContext(AuthContext);
+
+
+
   console.log(">>> check auth: ", auth);
 
 const items = [
@@ -35,7 +38,8 @@ const items = [
         ...(auth.isAuthenticated ? [
           {
             label: <span onClick={() => {
-              localStorage.clear("access_token");
+              localStorage.removeItem("access_token");
+              localStorage.removeItem("user");
               setAuth({
                 isAuthenticated: false,
                 user: {

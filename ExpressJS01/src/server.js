@@ -24,6 +24,9 @@ app.use('/', webAPI);
 // REST API
 app.use('/v1/api', apiRoutes);
 
+// Khởi tạo bảng favorites
+const { initializeFavoriteTable } = require('./models/favorite');
+
 // Khởi động sau khi kiểm tra kết nối DB
 (async () => {
   try {
@@ -31,6 +34,10 @@ app.use('/v1/api', apiRoutes);
     await conn.ping();
     conn.release();
     console.log('✅ MySQL Database connected!');
+
+    // Khởi tạo bảng favorites
+    await initializeFavoriteTable();
+
     app.listen(port, () => console.log(`🚀 Backend Nodejs App listening on port ${port}`));
   } catch (error) {
     console.log('❌ Error connect to DB:', error);

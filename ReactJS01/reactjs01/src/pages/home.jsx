@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CrownOutlined, SearchOutlined } from '@ant-design/icons';
+import { CrownOutlined, SearchOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons';
 import {
   Result,
   Button,
@@ -12,10 +12,14 @@ import {
   Form,
   Space,
   Checkbox,
+  message,
+  Modal,
+  Statistic,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import axios from '../util/axios.customize.js';
 import { searchProductsApi } from '../util/api.js';
+import ProductDetailModal from './ProductDetailModal';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -29,6 +33,21 @@ const HomePage = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const loaderRef = useRef(null);
+
+  // Viewed products
+  const [viewedProducts, setViewedProducts] = useState([]);
+  const [viewedLoading, setViewedLoading] = useState(false);
+
+  // Favorites
+  const [favorites, setFavorites] = useState(new Set());
+
+  // Modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [counts, setCounts] = useState({ buyerCount: 0, commenterCount: 0 });
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const fetchData = async (reset = false) => {
     try {
@@ -56,8 +75,72 @@ const HomePage = () => {
   };
 
   useEffect(() => {
+    // Đảm bảo user được lấy lại khi load lại trang và load favorites
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user && user.id) {
+          loadFavorites(user.id);
+        }
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
     fetchData(true);
+    fetchViewedProducts();
   }, []);
+
+  const fetchViewedProducts = async () => {
+    try {
+      setViewedLoading(true);
+      const response = await axios.get('/v1/api/products/viewed');
+      setViewedProducts(Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error('Error fetching viewed products:', error);
+    } finally {
+      setViewedLoading(false);
+    }
+  };
+
+  const loadFavorites = async (userId) => {
+    if (!userId) return; // Không tải nếu chưa đăng nhập
+    try {
+      const response = await axios.get(`/v1/api/products/favorites/${userId}`);
+      const favoriteIds = new Set(response.map(fav => fav.id));
+      setFavorites(favoriteIds);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  const handleCardFavorite = async (product, e) => {
+    e.stopPropagation(); // Ngăn không mở modal khi click vào nút yêu thích
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || !user.id) {
+      message.error('Vui lòng đăng nhập để sử dụng tính năng yêu thích');
+      return;
+    }
+    const isFav = favorites.has(product.id);
+    try {
+      if (isFav) {
+        await axios.delete('/v1/api/products/favorites', { data: { userId: user.id, productId: product.id } });
+        setFavorites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(product.id);
+          return newSet;
+        });
+        message.success('Đã xóa khỏi yêu thích');
+      } else {
+        await axios.post('/v1/api/products/favorites', { userId: user.id, productId: product.id });
+        setFavorites(prev => new Set([...prev, product.id]));
+        message.success('Đã thêm vào yêu thích');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      message.error('Lỗi khi cập nhật yêu thích');
+    }
+  };
 
   // Intersection Observer cho lazy load
   useEffect(() => {
@@ -111,6 +194,61 @@ const HomePage = () => {
     }
   };
 
+  const handleViewDetails = async (product) => {
+    setModalLoading(true);
+    setModalVisible(true);
+    setSelectedProduct(product);
+    setIsFavorite(favorites.has(product.id));
+
+    try {
+      const [similarResponse, countsResponse] = await Promise.all([
+        axios.get(`/v1/api/products/similar/${product.id}`),
+        axios.get(`/v1/api/products/${product.id}/counts`),
+      ]);
+
+      setSimilarProducts(Array.isArray(similarResponse) ? similarResponse : []);
+      setCounts(countsResponse || { buyerCount: 0, commenterCount: 0 });
+    } catch (error) {
+      console.error('Error fetching product details:', error);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleToggleFavorite = async (userId, productId = selectedProduct?.id) => {
+    if (!productId) return;
+
+    const isFav = isFavorite;
+    try {
+      if (isFav) {
+        await axios.delete('/v1/api/products/favorites', { data: { userId, productId } });
+        setFavorites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(productId);
+          return newSet;
+        });
+        setIsFavorite(false);
+        message.success('Đã xóa khỏi yêu thích');
+      } else {
+        await axios.post('/v1/api/products/favorites', { userId, productId });
+        setFavorites(prev => new Set([...prev, productId]));
+        setIsFavorite(true);
+        message.success('Đã thêm vào yêu thích');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      message.error('Lỗi khi cập nhật yêu thích');
+    }
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    setSelectedProduct(null);
+    setSimilarProducts([]);
+    setCounts({ buyerCount: 0, commenterCount: 0 });
+    setIsFavorite(false);
+  };
+
   return (
     <div style={{ padding: 20 }}>
       <Result
@@ -122,6 +260,64 @@ const HomePage = () => {
           </Button>
         }
       />
+
+      {/* Sản phẩm đã xem */}
+      <div style={{ marginTop: 20 }}>
+        <h2>Sản phẩm đã xem</h2>
+        {viewedLoading ? (
+          <Spin size="large" />
+        ) : viewedProducts.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <p>Chưa có sản phẩm đã xem.</p>
+          </div>
+        ) : (
+          <Row gutter={16}>
+            {viewedProducts.map((product) => (
+              <Col span={6} key={product.id}>
+                <Card
+                  hoverable
+                  cover={
+                    product.image_url ? (
+                      <img
+                        alt={product.name}
+                        src={product.image_url}
+                        style={{ height: 150, objectFit: 'cover' }}
+                        loading="lazy"
+                      />
+                    ) : null
+                  }
+                  actions={[
+                    favorites.has(product.id) ? (
+                      <HeartFilled
+                        key="favorite"
+                        style={{ color: 'red' }}
+                        onClick={(e) => handleCardFavorite(product, e)}
+                      />
+                    ) : (
+                      <HeartOutlined
+                        key="favorite"
+                        onClick={(e) => handleCardFavorite(product, e)}
+                      />
+                    ),
+                    <Button type="link" onClick={() => handleViewDetails(product)}>Xem chi tiết</Button>
+                  ]}
+                >
+                  <Card.Meta
+                    title={product.name}
+                    description={
+                      <div>
+                        <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                          {new Intl.NumberFormat('vi-VN').format(product.price)} VND
+                        </span>
+                      </div>
+                    }
+                  />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        )}
+      </div>
 
       <div style={{ marginTop: 20 }}>
         <h2>Tìm kiếm sản phẩm</h2>
@@ -209,95 +405,106 @@ const HomePage = () => {
           </div>
         ) : (
           <Row gutter={16}>
-            {products.map((product) => (
-              <Col span={8} key={product.id}>
-                <Card
-                  hoverable
-                  cover={
-                    product.image_url ? (
-                      <img
-                        alt={product.name}
-                        src={product.image_url}
-                        style={{ height: 200, objectFit: 'cover' }}
-                        loading="lazy" // ✅ lazy load ảnh
-                      />
-                    ) : null
-                  }
-                >
-                  <Card.Meta
-                    title={product.name}
-                    description={
-                      <div>
-                        <div
+          {products.map((product) => (
+            <Col span={8} key={product.id}>
+              <Card
+                hoverable
+                cover={
+                  product.image_url ? (
+                    <img
+                      alt={product.name}
+                      src={product.image_url}
+                      style={{ height: 200, objectFit: 'cover' }}
+                      loading="lazy" // ✅ lazy load ảnh
+                    />
+                  ) : null
+                }
+                actions={[
+                  <Button
+                    type="link"
+                    icon={favorites.has(product.id) ? <HeartFilled style={{ color: '#ff4d4f' }} /> : <HeartOutlined />}
+                    onClick={(e) => handleCardFavorite(product, e)}
+                    style={{ color: favorites.has(product.id) ? '#ff4d4f' : 'inherit' }}
+                  >
+                    {favorites.has(product.id) ? 'Đã thích' : 'Yêu thích'}
+                  </Button>,
+                  <Button type="link" onClick={() => handleViewDetails(product)}>Xem chi tiết</Button>
+                ]}
+              >
+                <Card.Meta
+                  title={product.name}
+                  description={
+                    <div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                      >
+                        <span
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
+                            fontWeight: 'bold',
+                            color: '#1890ff',
+                            fontSize: '16px',
                           }}
                         >
-                          <span
-                            style={{
-                              fontWeight: 'bold',
-                              color: '#1890ff',
-                              fontSize: '16px',
-                            }}
-                          >
-                            {new Intl.NumberFormat('vi-VN').format(
-                              product.price
-                            )}{' '}
-                            VND
-                          </span>
-                          {product.original_price &&
-                            product.discount_percentage > 0 && (
-                              <>
-                                <span
-                                  style={{
-                                    textDecoration: 'line-through',
-                                    color: '#999',
-                                    fontSize: '14px',
-                                  }}
-                                >
-                                  {new Intl.NumberFormat('vi-VN').format(
-                                    product.original_price
-                                  )}{' '}
-                                  VND
-                                </span>
-                                <span
-                                  style={{
-                                    backgroundColor: '#ff4d4f',
-                                    color: 'white',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    fontWeight: 'bold',
-                                  }}
-                                >
-                                  -{product.discount_percentage}%
-                                </span>
-                              </>
-                            )}
-                        </div>
-                        <div style={{ color: '#666', marginTop: '4px' }}>
-                          {product.category_name || 'Chưa có danh mục'}
-                        </div>
-                        {product.promotion && (
-                          <div
-                            style={{
-                              color: '#ff4d4f',
-                              fontWeight: 'bold',
-                              fontSize: '14px',
-                              marginTop: '4px',
-                            }}
-                          >
-                            🔥 Khuyến mãi hot
-                          </div>
-                        )}
+                          {new Intl.NumberFormat('vi-VN').format(
+                            product.price
+                          )}{' '}
+                          VND
+                        </span>
+                        {product.original_price &&
+                          product.discount_percentage > 0 && (
+                            <>
+                              <span
+                                style={{
+                                  textDecoration: 'line-through',
+                                  color: '#999',
+                                  fontSize: '14px',
+                                }}
+                              >
+                                {new Intl.NumberFormat('vi-VN').format(
+                                  product.original_price
+                                )}{' '}
+                                VND
+                              </span>
+                              <span
+                                style={{
+                                  backgroundColor: '#ff4d4f',
+                                  color: 'white',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                }}
+                              >
+                                -{product.discount_percentage}%
+                              </span>
+                            </>
+                          )}
                       </div>
-                    }
-                  />
-                </Card>
-              </Col>
-            ))}
+                      <div style={{ color: '#666', marginTop: '4px' }}>
+                        {product.category_name || 'Chưa có danh mục'}
+                      </div>
+                      {product.promotion && (
+                        <div
+                          style={{
+                            color: '#ff4d4f',
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            marginTop: '4px',
+                          }}
+                        >
+                          🔥 Khuyến mãi hot
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </Card>
+            </Col>
+          ))}
           </Row>
         )}
         {loading && products.length > 0 && (
@@ -305,6 +512,18 @@ const HomePage = () => {
         )}
         <div ref={loaderRef} style={{ height: 50 }} />
       </div>
+
+      <ProductDetailModal
+        modalVisible={modalVisible}
+        modalLoading={modalLoading}
+        selectedProduct={selectedProduct}
+        similarProducts={similarProducts}
+        counts={counts}
+        isFavorite={isFavorite}
+        handleToggleFavorite={handleToggleFavorite}
+        handleViewDetails={handleViewDetails}
+        onClose={() => setModalVisible(false)}
+      />
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { SearchOutlined, CrownOutlined } from '@ant-design/icons';
-import { Result, Button, Spin, Card, Row, Col, Input, Select, Form, Space, Checkbox, message } from 'antd';
+import { SearchOutlined, CrownOutlined, HeartOutlined, HeartFilled, EyeOutlined, ShoppingCartOutlined, CommentOutlined } from '@ant-design/icons';
+import { Result, Button, Spin, Card, Row, Col, Input, Select, Form, Space, Checkbox, message, Statistic } from 'antd';
 import axios from '../util/axios.customize.js';
 import { searchProductsApi } from '../util/api.js';
+import ProductDetailModal from './ProductDetailModal';
 
 const ProductPage = () => {
   const [products, setProducts] = useState([]);
@@ -11,6 +12,15 @@ const ProductPage = () => {
   const [searching, setSearching] = useState(false);
   const [form] = Form.useForm();
   const [addForm] = Form.useForm();
+
+  // Modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [counts, setCounts] = useState({ buyerCount: 0, commenterCount: 0 });
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [favorites, setFavorites] = useState(new Set()); // Lưu danh sách sản phẩm yêu thích
 
   // Tự động tính phần trăm giảm giá
   const calculateDiscountPercentage = (originalPrice, currentPrice) => {
@@ -55,7 +65,20 @@ const ProductPage = () => {
 
   useEffect(() => {
     fetchData();
+    loadFavorites();
   }, []);
+
+  const loadFavorites = async () => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) return; // Không tải nếu chưa đăng nhập
+    try {
+      const response = await axios.get(`/v1/api/products/favorites/${user.id}`);
+      const favoriteIds = new Set(response.map(fav => fav.id));
+      setFavorites(favoriteIds);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
 
   const handleAddProduct = async (values) => {
     try {
@@ -90,6 +113,86 @@ const ProductPage = () => {
       message.error('Lỗi khi tìm kiếm');
     } finally {
       setSearching(false);
+    }
+  };
+
+  const handleViewDetails = async (product) => {
+    setSelectedProduct(product);
+    setModalVisible(true);
+    setModalLoading(true);
+    try {
+      // Fetch similar products
+      const similarResponse = await axios.get(`/v1/api/products/similar/${product.id}`);
+      setSimilarProducts(Array.isArray(similarResponse) ? similarResponse : []);
+
+      // Fetch counts
+      const countsResponse = await axios.get(`/v1/api/products/${product.id}/counts`);
+      setCounts(countsResponse);
+
+      // Check if favorite
+      const isFav = favorites.has(product.id);
+      setIsFavorite(isFav);
+    } catch (error) {
+      console.error('Error fetching product details:', error);
+      message.error('Lỗi khi tải chi tiết sản phẩm');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleToggleFavorite = async (userId, productId = selectedProduct?.id) => {
+    if (!productId) return;
+
+    try {
+      if (isFavorite) {
+        await axios.delete('/v1/api/products/favorites', { data: { userId, productId } });
+        setIsFavorite(false);
+        setFavorites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(productId);
+          return newSet;
+        });
+        message.success('Đã xóa khỏi yêu thích');
+      } else {
+        await axios.post('/v1/api/products/favorites', { userId, productId });
+        setIsFavorite(true);
+        setFavorites(prev => new Set([...prev, productId]));
+        message.success('Đã thêm vào yêu thích');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      message.error('Lỗi khi cập nhật yêu thích');
+    }
+  };
+
+  const handleCardFavorite = async (product, e) => {
+    console.log('handleCardFavorite called for product:', product.id);
+    e.stopPropagation(); // Ngăn không mở modal khi click vào nút yêu thích
+    const user = JSON.parse(localStorage.getItem('user'));
+    console.log('User from localStorage:', user);
+    if (!user) {
+      message.error('Vui lòng đăng nhập để sử dụng tính năng yêu thích');
+      return;
+    }
+    const isFav = favorites.has(product.id);
+    console.log('Is favorite:', isFav);
+    try {
+      if (isFav) {
+        await axios.delete('/v1/api/products/favorites', { data: { userId: user.id, productId: product.id } });
+        setFavorites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(product.id);
+          return newSet;
+        });
+        message.success('Đã xóa khỏi yêu thích');
+      } else {
+        await axios.post('/v1/api/products/favorites', { userId: user.id, productId: product.id });
+        setFavorites(prev => new Set([...prev, product.id]));
+        message.success('Đã thêm vào yêu thích');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      message.error('Lỗi khi cập nhật yêu thích');
     }
   };
 
@@ -234,6 +337,17 @@ const ProductPage = () => {
                 <Card
                   hoverable
                   cover={p.image_url ? <img src={p.image_url} alt={p.name} style={{ height: 200, objectFit: 'cover' }} /> : null}
+                  actions={[
+                    <Button
+                      type="link"
+                      icon={favorites.has(p.id) ? <HeartFilled style={{ color: '#ff4d4f' }} /> : <HeartOutlined />}
+                      onClick={(e) => handleCardFavorite(p, e)}
+                      style={{ color: favorites.has(p.id) ? '#ff4d4f' : 'inherit' }}
+                    >
+                      {favorites.has(p.id) ? 'Đã thích' : 'Yêu thích'}
+                    </Button>,
+                    <Button type="link" onClick={() => handleViewDetails(p)}>Xem chi tiết</Button>
+                  ]}
                 >
                   <Card.Meta
                     title={p.name}
@@ -271,6 +385,18 @@ const ProductPage = () => {
           </Row>
         )}
       </div>
+
+      <ProductDetailModal
+        modalVisible={modalVisible}
+        modalLoading={modalLoading}
+        selectedProduct={selectedProduct}
+        similarProducts={similarProducts}
+        counts={counts}
+        isFavorite={isFavorite}
+        handleToggleFavorite={handleToggleFavorite}
+        handleViewDetails={handleViewDetails}
+        onClose={() => setModalVisible(false)}
+      />
     </div>
   );
 };
