@@ -20,6 +20,12 @@ const getUserApi = () => {
   return axios.get(URL_API);
 };
 
+// Lấy thông tin người dùng hiện tại
+const getCurrentUserApi = () => {
+  const URL_API = '/v1/api/user/profile';
+  return axios.get(URL_API);
+};
+
 // ✅ Lấy danh sách tất cả sản phẩm kèm danh mục
 const getProductsWithCategoryApi = () => {
   const URL_API = '/v1/api/products/with-category';
@@ -50,6 +56,7 @@ export {
   createUserApi,
   loginApi,
   getUserApi,
+  getCurrentUserApi,
   getProductsWithCategoryApi,
   getAllCategoriesApi,
   searchProductsApi

@@ -1,4 +1,4 @@
-# TODO List - Product Detail Modal Implementation
+# TODO List - Add User Profile Features
 
 ## Completed Tasks
 - [x] Update "Xem chi tiết" button in "Sản phẩm đã xem" section to call handleViewDetails
@@ -7,13 +7,8 @@
 - [x] Add ProductDetailModal import to HomePage
 - [x] Add ProductDetailModal component to HomePage return statement
 
-## Summary
-Successfully implemented a modal-based product detail view that displays:
-- Product image and basic information
-- Pricing with discount information
-- Category and promotion status
-- Buyer and commenter counts
-- List of similar products
-- Favorite toggle functionality
-
-The modal opens when clicking "Xem chi tiết" buttons instead of navigating to a separate page, providing a better user experience with quick access to product information without leaving the current page.
+## Pending Tasks
+- [x] Add getCurrentUser function in userController.js
+- [x] Add route for /v1/api/user/profile in api.js
+- [x] Modify user.jsx to display current user personal info, favorites, recently viewed
+- [x] Test the user page functionality

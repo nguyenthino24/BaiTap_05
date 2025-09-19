@@ -1,6 +1,6 @@
 // routes/api.js
 const express = require('express');
-const { createUser, handleLogin, getUser, getAccount } = require('../controllers/userController');
+const { createUser, handleLogin, getUser, getAccount, getCurrentUser } = require('../controllers/userController');
 const categoryRoutes = require('./category');
 const productRoutes = require('./product');
 const auth = require('../middleware/auth');
@@ -17,6 +17,7 @@ routerAPI.post('/login', handleLogin);
 
 // protected
 routerAPI.get('/user', auth, getUser);
+routerAPI.get('/user/profile', auth, getCurrentUser);
 routerAPI.get('/account', delay, getAccount);
 
 // business

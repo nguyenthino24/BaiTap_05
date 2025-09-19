@@ -1,4 +1,5 @@
 const { createUserService, loginService, getUserService } = require('../services/userService');
+const { getUserById } = require('../models/user');
 
 const createUser = async (req, res) => {
     try {
@@ -43,12 +44,25 @@ const getAccount = async (req, res) => {
         return res.status(500).json({ message: 'Lỗi máy chủ' });
     }
 };
-const { getUserById } = require('../models/user');
-
 const getUser = async (req, res) => {
     const data = await getUserService();
     return res.status(200).json(data);
 }
+
+const getCurrentUser = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const user = await getUserById(userId);
+        if (user) {
+            return res.status(200).json(user);
+        } else {
+            return res.status(404).json({ message: 'Người dùng không tồn tại' });
+        }
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ message: 'Lỗi máy chủ' });
+    }
+};
 
 
 
@@ -57,4 +71,5 @@ module.exports = {
     handleLogin,
     getUser,
     getAccount,
+    getCurrentUser,
 };

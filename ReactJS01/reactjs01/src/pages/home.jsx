@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from '../util/axios.customize.js';
 import { searchProductsApi } from '../util/api.js';
 import ProductDetailModal from './ProductDetailModal';
+import { getRecentlyViewed, addToRecentlyViewed } from '../util/recentlyViewed.js';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -88,16 +89,16 @@ const HomePage = () => {
       }
     }
     fetchData(true);
-    fetchViewedProducts();
+    loadViewedProducts();
   }, []);
 
-  const fetchViewedProducts = async () => {
+  const loadViewedProducts = () => {
     try {
       setViewedLoading(true);
-      const response = await axios.get('/v1/api/products/viewed');
-      setViewedProducts(Array.isArray(response) ? response : []);
+      const viewed = getRecentlyViewed();
+      setViewedProducts(viewed);
     } catch (error) {
-      console.error('Error fetching viewed products:', error);
+      console.error('Error loading viewed products:', error);
     } finally {
       setViewedLoading(false);
     }
@@ -201,6 +202,12 @@ const HomePage = () => {
     setIsFavorite(favorites.has(product.id));
 
     try {
+      addToRecentlyViewed(product);
+    } catch (error) {
+      console.error('Error adding to recently viewed:', error);
+    }
+
+    try {
       const [similarResponse, countsResponse] = await Promise.all([
         axios.get(`/v1/api/products/similar/${product.id}`),
         axios.get(`/v1/api/products/${product.id}/counts`),
@@ -260,64 +267,6 @@ const HomePage = () => {
           </Button>
         }
       />
-
-      {/* Sản phẩm đã xem */}
-      <div style={{ marginTop: 20 }}>
-        <h2>Sản phẩm đã xem</h2>
-        {viewedLoading ? (
-          <Spin size="large" />
-        ) : viewedProducts.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <p>Chưa có sản phẩm đã xem.</p>
-          </div>
-        ) : (
-          <Row gutter={16}>
-            {viewedProducts.map((product) => (
-              <Col span={6} key={product.id}>
-                <Card
-                  hoverable
-                  cover={
-                    product.image_url ? (
-                      <img
-                        alt={product.name}
-                        src={product.image_url}
-                        style={{ height: 150, objectFit: 'cover' }}
-                        loading="lazy"
-                      />
-                    ) : null
-                  }
-                  actions={[
-                    favorites.has(product.id) ? (
-                      <HeartFilled
-                        key="favorite"
-                        style={{ color: 'red' }}
-                        onClick={(e) => handleCardFavorite(product, e)}
-                      />
-                    ) : (
-                      <HeartOutlined
-                        key="favorite"
-                        onClick={(e) => handleCardFavorite(product, e)}
-                      />
-                    ),
-                    <Button type="link" onClick={() => handleViewDetails(product)}>Xem chi tiết</Button>
-                  ]}
-                >
-                  <Card.Meta
-                    title={product.name}
-                    description={
-                      <div>
-                        <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
-                          {new Intl.NumberFormat('vi-VN').format(product.price)} VND
-                        </span>
-                      </div>
-                    }
-                  />
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        )}
-      </div>
 
       <div style={{ marginTop: 20 }}>
         <h2>Tìm kiếm sản phẩm</h2>
@@ -393,6 +342,64 @@ const HomePage = () => {
             </Space>
           </Form.Item>
         </Form>
+      </div>
+
+      {/* Sản phẩm đã xem */}
+      <div style={{ marginTop: 20 }}>
+        <h2>Sản phẩm đã xem gần đây</h2>
+        {viewedLoading ? (
+          <Spin size="large" />
+        ) : viewedProducts.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <p>Chưa có sản phẩm đã xem.</p>
+          </div>
+        ) : (
+          <Row gutter={16}>
+            {viewedProducts.map((product) => (
+              <Col span={6} key={product.id}>
+                <Card
+                  hoverable
+                  cover={
+                    product.image_url ? (
+                      <img
+                        alt={product.name}
+                        src={product.image_url}
+                        style={{ height: 150, objectFit: 'cover' }}
+                        loading="lazy"
+                      />
+                    ) : null
+                  }
+                  actions={[
+                    favorites.has(product.id) ? (
+                      <HeartFilled
+                        key="favorite"
+                        style={{ color: 'red' }}
+                        onClick={(e) => handleCardFavorite(product, e)}
+                      />
+                    ) : (
+                      <HeartOutlined
+                        key="favorite"
+                        onClick={(e) => handleCardFavorite(product, e)}
+                      />
+                    ),
+                    <Button type="link" onClick={() => handleViewDetails(product)}>Xem chi tiết</Button>
+                  ]}
+                >
+                  <Card.Meta
+                    title={product.name}
+                    description={
+                      <div>
+                        <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                          {new Intl.NumberFormat('vi-VN').format(product.price)} VND
+                        </span>
+                      </div>
+                    }
+                  />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        )}
       </div>
 
       <div style={{ marginTop: 20 }}>
