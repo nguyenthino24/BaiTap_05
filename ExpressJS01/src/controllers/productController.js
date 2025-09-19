@@ -2,6 +2,8 @@ const Product = require("../models/product");
 const esClient = require("../config/elasticsearch");
 const { pool } = require("../models/user");
 const Favorite = require("../models/favorite");
+const Order = require("../models/order");
+const Comment = require("../models/comment");
 
 exports.getAllProducts = async (req, res) => {
   try {
@@ -180,14 +182,13 @@ exports.getViewedProducts = async (req, res) => {
   }
 };
 
-// Đếm số khách mua và khách bình luận trên sản phẩm
 exports.getBuyerCommenterCounts = async (req, res) => {
   try {
     const productId = req.params.productId;
     if (!productId) {
       return res.status(400).json({ message: "Thiếu productId" });
     }
-    // Giả định có bảng orders và comments, đếm số user mua và bình luận
+    // Đếm số khách mua và khách bình luận trên sản phẩm từ bảng orders và comments
     const [buyerRows] = await pool.query(
       "SELECT COUNT(DISTINCT user_id) AS buyerCount FROM orders WHERE product_id = ?",
       [productId]
@@ -206,4 +207,63 @@ exports.getBuyerCommenterCounts = async (req, res) => {
   }
 };
 
-// Initialize favorites table on server start - moved to model
+exports.createOrder = async (req, res) => {
+  try {
+    const { userId, productId, quantity } = req.body;
+    if (!userId || !productId) {
+      return res.status(400).json({ message: "Thiếu userId hoặc productId" });
+    }
+    const orderId = await Order.createOrder(userId, productId, quantity || 1);
+    res.status(201).json({ message: "Đã tạo đơn hàng", orderId });
+  } catch (error) {
+    console.error("❌ Lỗi khi tạo đơn hàng:", error.message);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+exports.createComment = async (req, res) => {
+  try {
+    const { userId, productId, commentText } = req.body;
+    if (!userId || !productId || !commentText) {
+      return res.status(400).json({ message: "Thiếu thông tin bình luận" });
+    }
+    // Kiểm tra user đã mua sản phẩm chưa
+    const hasPurchased = await Order.hasUserPurchasedProduct(userId, productId);
+    if (!hasPurchased) {
+      return res.status(403).json({ message: "Chỉ người mua sản phẩm mới được bình luận" });
+    }
+    const commentId = await Comment.createComment(userId, productId, commentText);
+    res.status(201).json({ message: "Đã thêm bình luận", commentId });
+  } catch (error) {
+    console.error("❌ Lỗi khi tạo bình luận:", error.message);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+exports.getCommentsByProduct = async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    if (!productId) {
+      return res.status(400).json({ message: "Thiếu productId" });
+    }
+    const comments = await Comment.getCommentsByProduct(productId);
+    res.json(comments);
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy bình luận:", error.message);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+exports.checkPurchase = async (req, res) => {
+  try {
+    const { userId, productId } = req.query;
+    if (!userId || !productId) {
+      return res.status(400).json({ message: "Thiếu userId hoặc productId" });
+    }
+    const hasPurchased = await Order.hasUserPurchasedProduct(userId, productId);
+    res.json({ hasPurchased });
+  } catch (error) {
+    console.error("❌ Lỗi khi kiểm tra mua hàng:", error.message);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};

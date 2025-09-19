@@ -23,4 +23,14 @@ router.get("/viewed", productController.getViewedProducts);
 // Buyer and commenter counts
 router.get("/counts/:productId", productController.getBuyerCommenterCounts);
 
+// Orders
+router.post("/order", productController.createOrder);
+
+// Comments
+router.post("/comment", productController.createComment);
+router.get("/comments/:productId", productController.getCommentsByProduct);
+
+// Check purchase
+router.get("/check-purchase", productController.checkPurchase);
+
 module.exports = router;

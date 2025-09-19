@@ -222,6 +222,15 @@ const HomePage = () => {
     }
   };
 
+  const refreshCounts = async (productId) => {
+    try {
+      const countsResponse = await axios.get(`/v1/api/products/counts/${productId}`);
+      setCounts(countsResponse || { buyerCount: 0, commenterCount: 0 });
+    } catch (error) {
+      console.error('Error refreshing counts:', error);
+    }
+  };
+
   const handleToggleFavorite = async (userId, productId = selectedProduct?.id) => {
     if (!productId) return;
 
@@ -343,65 +352,6 @@ const HomePage = () => {
           </Form.Item>
         </Form>
       </div>
-
-      {/* Sản phẩm đã xem */}
-      <div style={{ marginTop: 20 }}>
-        <h2>Sản phẩm đã xem gần đây</h2>
-        {viewedLoading ? (
-          <Spin size="large" />
-        ) : viewedProducts.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <p>Chưa có sản phẩm đã xem.</p>
-          </div>
-        ) : (
-          <Row gutter={16}>
-            {viewedProducts.map((product) => (
-              <Col span={6} key={product.id}>
-                <Card
-                  hoverable
-                  cover={
-                    product.image_url ? (
-                      <img
-                        alt={product.name}
-                        src={product.image_url}
-                        style={{ height: 150, objectFit: 'cover' }}
-                        loading="lazy"
-                      />
-                    ) : null
-                  }
-                  actions={[
-                    favorites.has(product.id) ? (
-                      <HeartFilled
-                        key="favorite"
-                        style={{ color: 'red' }}
-                        onClick={(e) => handleCardFavorite(product, e)}
-                      />
-                    ) : (
-                      <HeartOutlined
-                        key="favorite"
-                        onClick={(e) => handleCardFavorite(product, e)}
-                      />
-                    ),
-                    <Button type="link" onClick={() => handleViewDetails(product)}>Xem chi tiết</Button>
-                  ]}
-                >
-                  <Card.Meta
-                    title={product.name}
-                    description={
-                      <div>
-                        <span style={{ fontWeight: 'bold', color: '#1890ff' }}>
-                          {new Intl.NumberFormat('vi-VN').format(product.price)} VND
-                        </span>
-                      </div>
-                    }
-                  />
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        )}
-      </div>
-
       <div style={{ marginTop: 20 }}>
         <h2>Sản phẩm</h2>
         {loading && products.length === 0 ? (
@@ -530,6 +480,7 @@ const HomePage = () => {
         handleToggleFavorite={handleToggleFavorite}
         handleViewDetails={handleViewDetails}
         onClose={() => setModalVisible(false)}
+        refreshCounts={refreshCounts}
       />
     </div>
   );
