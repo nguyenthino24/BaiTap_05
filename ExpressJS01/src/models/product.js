@@ -226,11 +226,58 @@ async function getProductsPaginated({ categoryId, page = 1, limit = 10 }) {
   };
 }
 
+async function incrementProductViews(productId) {
+  try {
+    const [result] = await pool.query(
+      'UPDATE products SET views = views + 1 WHERE id = ?',
+      [productId]
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error('Product not found');
+    }
+
+    // Get updated product data
+    const [updatedProduct] = await pool.query(
+      'SELECT * FROM products WHERE id = ?',
+      [productId]
+    );
+
+    return updatedProduct[0];
+  } catch (error) {
+    console.error('❌ Lỗi khi tăng lượt xem sản phẩm:', error.message);
+    throw error;
+  }
+}
+
+async function getProductById(productId) {
+  try {
+    const [rows] = await pool.query(
+      `SELECT products.*, categories.name AS category_name
+       FROM products
+       LEFT JOIN categories ON products.category_id = categories.id
+       WHERE products.id = ?`,
+      [productId]
+    );
+
+    if (rows.length === 0) {
+      throw new Error('Product not found');
+    }
+
+    return rows[0];
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy sản phẩm theo ID:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   getAllProducts,
   createProduct,
   getProductsWithCategories,
   searchProductsMySQL,
-  getProductsPaginated
+  getProductsPaginated,
+  incrementProductViews,
+  getProductById
 };
 

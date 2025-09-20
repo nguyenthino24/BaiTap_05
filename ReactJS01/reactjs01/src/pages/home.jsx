@@ -210,7 +210,7 @@ const HomePage = () => {
     try {
       const [similarResponse, countsResponse] = await Promise.all([
         axios.get(`/v1/api/products/similar/${product.id}`),
-        axios.get(`/v1/api/products/${product.id}/counts`),
+        axios.get(`/v1/api/products/counts/${product.id}`),
       ]);
 
       setSimilarProducts(Array.isArray(similarResponse) ? similarResponse : []);

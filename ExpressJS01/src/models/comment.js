@@ -1,4 +1,5 @@
-const { pool } = require('./user');
+const userModel = require('./user');
+const pool = userModel.pool;
 
 async function initializeCommentTable() {
   const createTableQuery = `
@@ -35,18 +36,41 @@ async function createComment(userId, productId, commentText) {
 }
 
 async function getCommentsByProduct(productId) {
-  const query = `
-    SELECT c.*, u.name AS user_name
-    FROM comments c
-    JOIN users u ON c.user_id = u.id
-    WHERE c.product_id = ?
-    ORDER BY c.comment_date DESC
-  `;
   try {
+    console.log(`📝 Đang lấy bình luận cho sản phẩm ${productId}`);
+
+    const query = `
+      SELECT c.id, c.user_id, c.product_id, c.comment_text, c.comment_date,
+             u.name AS user_name, u.email AS user_email
+      FROM comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.product_id = ?
+      ORDER BY c.comment_date DESC
+    `;
+
     const [rows] = await pool.query(query, [productId]);
+    console.log(`✅ Tìm thấy ${rows.length} bình luận cho sản phẩm ${productId}`);
     return rows;
   } catch (error) {
     console.error('❌ Lỗi khi lấy bình luận:', error);
+    throw error;
+  }
+}
+
+// Thêm function để lấy thống kê bình luận
+async function getCommentStats(productId) {
+  try {
+    const query = `
+      SELECT
+        COUNT(*) as total_comments,
+        COUNT(DISTINCT c.user_id) as unique_commenters
+      FROM comments c
+      WHERE c.product_id = ?
+    `;
+    const [rows] = await pool.query(query, [productId]);
+    return rows[0];
+  } catch (error) {
+    console.error('❌ Lỗi khi lấy thống kê bình luận:', error);
     throw error;
   }
 }
@@ -56,4 +80,5 @@ initializeCommentTable();
 module.exports = {
   createComment,
   getCommentsByProduct,
+  getCommentStats,
 };

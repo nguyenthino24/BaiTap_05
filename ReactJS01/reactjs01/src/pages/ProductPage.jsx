@@ -126,7 +126,7 @@ const ProductPage = () => {
       setSimilarProducts(Array.isArray(similarResponse) ? similarResponse : []);
 
       // Fetch counts
-      const countsResponse = await axios.get(`/v1/api/products/${product.id}/counts`);
+      const countsResponse = await axios.get(`/v1/api/products/counts/${product.id}`);
       setCounts(countsResponse);
 
       // Check if favorite
@@ -370,6 +370,10 @@ const ProductPage = () => {
                         </div>
                         <div style={{ color: '#666', marginTop: '4px' }}>
                           {p.category_name || 'Chưa có danh mục'}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', color: '#888', fontSize: '12px' }}>
+                          <EyeOutlined />
+                          <span>{p.views || 0} lượt xem</span>
                         </div>
                         {p.promotion && (
                           <div style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: '14px', marginTop: '4px' }}>

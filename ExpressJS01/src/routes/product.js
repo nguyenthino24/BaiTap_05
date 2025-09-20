@@ -29,8 +29,15 @@ router.post("/order", productController.createOrder);
 // Comments
 router.post("/comment", productController.createComment);
 router.get("/comments/:productId", productController.getCommentsByProduct);
+router.get("/comment-stats/:productId", productController.getCommentStats);
 
 // Check purchase
 router.get("/check-purchase", productController.checkPurchase);
+
+// Get single product
+router.get("/single/:productId", productController.getProductById);
+
+// Increment views
+router.put("/view/:productId", productController.incrementViews);
 
 module.exports = router;

@@ -188,13 +188,13 @@ exports.getBuyerCommenterCounts = async (req, res) => {
     if (!productId) {
       return res.status(400).json({ message: "Thiếu productId" });
     }
-    // Đếm số khách mua và khách bình luận trên sản phẩm từ bảng orders và comments
+    // Đếm tổng lượt mua và tổng số bình luận trên sản phẩm từ bảng orders và comments
     const [buyerRows] = await pool.query(
-      "SELECT COUNT(DISTINCT user_id) AS buyerCount FROM orders WHERE product_id = ?",
+      "SELECT COUNT(*) AS buyerCount FROM orders WHERE product_id = ?",
       [productId]
     );
     const [commenterRows] = await pool.query(
-      "SELECT COUNT(DISTINCT user_id) AS commenterCount FROM comments WHERE product_id = ?",
+      "SELECT COUNT(*) AS commenterCount FROM comments WHERE product_id = ?",
       [productId]
     );
     res.json({
@@ -202,7 +202,7 @@ exports.getBuyerCommenterCounts = async (req, res) => {
       commenterCount: commenterRows[0]?.commenterCount || 0
     });
   } catch (error) {
-    console.error("❌ Lỗi khi đếm khách mua và bình luận:", error.message);
+    console.error("❌ Lỗi khi đếm lượt mua và bình luận:", error.message);
     res.status(500).json({ message: "Lỗi server" });
   }
 };
@@ -246,11 +246,48 @@ exports.getCommentsByProduct = async (req, res) => {
     if (!productId) {
       return res.status(400).json({ message: "Thiếu productId" });
     }
+
+    console.log(`📡 API: Lấy bình luận cho sản phẩm ${productId}`);
     const comments = await Comment.getCommentsByProduct(productId);
-    res.json(comments);
+
+    console.log(`✅ API: Trả về ${comments.length} bình luận cho sản phẩm ${productId}`);
+    res.json({
+      success: true,
+      data: comments,
+      count: comments.length
+    });
   } catch (error) {
     console.error("❌ Lỗi khi lấy bình luận:", error.message);
-    res.status(500).json({ message: "Lỗi server" });
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy bình luận",
+      error: error.message
+    });
+  }
+};
+
+exports.getCommentStats = async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    if (!productId) {
+      return res.status(400).json({ message: "Thiếu productId" });
+    }
+
+    console.log(`📊 API: Lấy thống kê bình luận cho sản phẩm ${productId}`);
+    const stats = await Comment.getCommentStats(productId);
+
+    console.log(`✅ API: Thống kê bình luận cho sản phẩm ${productId}:`, stats);
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy thống kê bình luận:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi server khi lấy thống kê bình luận",
+      error: error.message
+    });
   }
 };
 
@@ -265,5 +302,44 @@ exports.checkPurchase = async (req, res) => {
   } catch (error) {
     console.error("❌ Lỗi khi kiểm tra mua hàng:", error.message);
     res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
+exports.getProductById = async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    if (!productId) {
+      return res.status(400).json({ message: "Thiếu productId" });
+    }
+    const product = await Product.getProductById(productId);
+    res.json(product);
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy sản phẩm theo ID:", error.message);
+    if (error.message === 'Product not found') {
+      res.status(404).json({ message: "Không tìm thấy sản phẩm" });
+    } else {
+      res.status(500).json({ message: "Lỗi server" });
+    }
+  }
+};
+
+exports.incrementViews = async (req, res) => {
+  try {
+    const productId = req.params.productId;
+    if (!productId) {
+      return res.status(400).json({ message: "Thiếu productId" });
+    }
+    const updatedProduct = await Product.incrementProductViews(productId);
+    res.json({
+      message: "Đã tăng lượt xem sản phẩm",
+      product: updatedProduct
+    });
+  } catch (error) {
+    console.error("❌ Lỗi khi tăng lượt xem sản phẩm:", error.message);
+    if (error.message === 'Product not found') {
+      res.status(404).json({ message: "Không tìm thấy sản phẩm" });
+    } else {
+      res.status(500).json({ message: "Lỗi server" });
+    }
   }
 };

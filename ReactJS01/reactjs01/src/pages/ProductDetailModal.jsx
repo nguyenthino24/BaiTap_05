@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Row, Col, Button, Spin, Statistic, Card, message, Input, List } from 'antd';
-import { HeartOutlined, HeartFilled, ShoppingCartOutlined, CommentOutlined } from '@ant-design/icons';
+import { HeartOutlined, HeartFilled, ShoppingCartOutlined, CommentOutlined, EyeOutlined } from '@ant-design/icons';
 import axios from '../util/axios.customize.js';
 import CheckoutPage from './CheckoutPage';
 
@@ -17,43 +17,80 @@ const ProductDetailModal = ({
   handleViewDetails,
   onClose,
   refreshCounts,
+  onViewCountUpdate, // Thêm callback để cập nhật lượt xem
 }) => {
   const [userHasPurchased, setUserHasPurchased] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState([]);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
+  const [currentViews, setCurrentViews] = useState(0);
 
   useEffect(() => {
     if (modalVisible && selectedProduct) {
       const userStr = localStorage.getItem('user');
-      if (!userStr) {
+      let user = null;
+
+      if (userStr) {
+        try {
+          user = JSON.parse(userStr);
+          if (user && user.id) {
+            // Check purchase only if user is logged in
+            axios.get(`/v1/api/products/check-purchase?userId=${user.id}&productId=${selectedProduct.id}`)
+              .then(res => setUserHasPurchased(res.data.hasPurchased))
+              .catch(() => setUserHasPurchased(false));
+          } else {
+            setUserHasPurchased(false);
+          }
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+          setUserHasPurchased(false);
+        }
+      } else {
         setUserHasPurchased(false);
-        setComments([]);
-        return;
-      }
-      const user = JSON.parse(userStr);
-      if (!user || !user.id) {
-        setUserHasPurchased(false);
-        setComments([]);
-        return;
       }
 
-      // Check purchase
-      axios.get(`/v1/api/products/check-purchase?userId=${user.id}&productId=${selectedProduct.id}`)
-        .then(res => setUserHasPurchased(res.data.hasPurchased))
-        .catch(() => setUserHasPurchased(false));
-
-      // Load comments
+      // Load comments - always load regardless of login status
       axios.get(`/v1/api/products/comments/${selectedProduct.id}`)
-        .then(res => setComments(res.data || []))
-        .catch(() => setComments([]));
+        .then(res => {
+          console.log('📝 Frontend: Nhận được bình luận:', res.data);
+          if (res.data && res.data.success) {
+            setComments(res.data.data || []);
+          } else {
+            setComments(res.data || []);
+          }
+        })
+        .catch(error => {
+          console.error('❌ Frontend: Lỗi khi tải bình luận:', error);
+          message.error('Không thể tải bình luận. Vui lòng thử lại.');
+          setComments([]);
+        });
+
+      // Increment view count when modal opens
+      axios.put(`/v1/api/products/view/${selectedProduct.id}`)
+        .then(res => {
+          console.log('✅ View count incremented:', res.data);
+          // Update the views count in the selected product
+          if (res.data && res.data.product) {
+            const newViews = res.data.product.views;
+            setCurrentViews(newViews);
+
+            // Gọi callback để cập nhật lượt xem trong component cha
+            if (onViewCountUpdate && typeof onViewCountUpdate === 'function') {
+              onViewCountUpdate(selectedProduct.id, newViews);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('❌ Error incrementing view count:', error);
+        });
     } else {
       setUserHasPurchased(false);
       setComments([]);
       setCommentText('');
+      setCurrentViews(0);
     }
-  }, [modalVisible, selectedProduct]);
+  }, [modalVisible, selectedProduct, onViewCountUpdate]);
 
   const handleFavoriteClick = async () => {
     const userStr = localStorage.getItem('user');
@@ -117,6 +154,9 @@ const ProductDetailModal = ({
     }
   };
 
+  // Use currentViews if available, otherwise fall back to selectedProduct.views
+  const displayViews = currentViews > 0 ? currentViews : (selectedProduct?.views || 0);
+
   return (
     <>
       <Modal
@@ -156,8 +196,9 @@ const ProductDetailModal = ({
                 )}
                 <p><strong>Danh mục:</strong> {selectedProduct.category_name}</p>
                 <div style={{ marginTop: 16 }}>
-                  <Statistic title="Số khách đã mua" value={counts.buyerCount} prefix={<ShoppingCartOutlined />} />
-                  <Statistic title="Số khách đã bình luận" value={counts.commenterCount} prefix={<CommentOutlined />} style={{ marginTop: 8 }} />
+                  <Statistic title="Lượt xem" value={displayViews} prefix={<EyeOutlined />} />
+                  <Statistic title="Lượt mua" value={counts.buyerCount} prefix={<ShoppingCartOutlined />} style={{ marginTop: 8 }} />
+                  <Statistic title="Số bình luận" value={counts.commenterCount} prefix={<CommentOutlined />} style={{ marginTop: 8 }} />
                 </div>
               </Col>
             </Row>
@@ -182,43 +223,46 @@ const ProductDetailModal = ({
               </Row>
             </div>
 
-            {userHasPurchased ? (
-              <div style={{ marginTop: 24 }}>
-                <h4>Bình luận</h4>
-                <List
-                  dataSource={comments}
-                  locale={{ emptyText: 'Chưa có bình luận nào' }}
-                  renderItem={item => (
-                    <List.Item>
-                      <List.Item.Meta
-                        title={item.user_name}
-                        description={item.comment_text}
-                      />
-                      <div>{new Date(item.comment_date).toLocaleString()}</div>
-                    </List.Item>
-                  )}
-                />
-                <TextArea
-                  rows={4}
-                  value={commentText}
-                  onChange={e => setCommentText(e.target.value)}
-                  placeholder="Viết bình luận của bạn..."
-                  style={{ marginTop: 12 }}
-                />
-                <Button
-                  type="primary"
-                  onClick={handleCommentSubmit}
-                  loading={commentSubmitting}
-                  style={{ marginTop: 8 }}
-                >
-                  Gửi bình luận
-                </Button>
-              </div>
-            ) : (
-              <div style={{ marginTop: 24, fontStyle: 'italic', color: '#888' }}>
-                Bạn phải mua sản phẩm mới có thể bình luận.
-              </div>
-            )}
+            <div style={{ marginTop: 24 }}>
+              <h4>Bình luận</h4>
+              <List
+                dataSource={comments}
+                locale={{ emptyText: 'Chưa có bình luận nào' }}
+                renderItem={item => (
+                  <List.Item>
+                    <List.Item.Meta
+                      title={item.user_name}
+                      description={item.comment_text}
+                    />
+                    <div>{new Date(item.comment_date).toLocaleString()}</div>
+                  </List.Item>
+                )}
+              />
+
+              {userHasPurchased ? (
+                <>
+                  <TextArea
+                    rows={4}
+                    value={commentText}
+                    onChange={e => setCommentText(e.target.value)}
+                    placeholder="Viết bình luận của bạn..."
+                    style={{ marginTop: 12 }}
+                  />
+                  <Button
+                    type="primary"
+                    onClick={handleCommentSubmit}
+                    loading={commentSubmitting}
+                    style={{ marginTop: 8 }}
+                  >
+                    Gửi bình luận
+                  </Button>
+                </>
+              ) : (
+                <div style={{ marginTop: 12, fontStyle: 'italic', color: '#888' }}>
+                  Bạn phải mua sản phẩm mới có thể bình luận.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Modal>

@@ -181,7 +181,7 @@ const UserPage = () => {
     try {
       const [similarResponse, countsResponse] = await Promise.all([
         axios.get(`/v1/api/products/similar/${product.id}`),
-        axios.get(`/v1/api/products/${product.id}/counts`),
+        axios.get(`/v1/api/products/counts/${product.id}`),
       ]);
       setSimilarProducts(Array.isArray(similarResponse) ? similarResponse : []);
       setCounts(countsResponse || { buyerCount: 0, commenterCount: 0 });
@@ -199,6 +199,15 @@ const UserPage = () => {
     setSimilarProducts([]);
     setCounts({ buyerCount: 0, commenterCount: 0 });
     setIsFavorite(false);
+  };
+
+  const refreshCounts = async (productId) => {
+    try {
+      const countsResponse = await axios.get(`/v1/api/products/counts/${productId}`);
+      setCounts(countsResponse || { buyerCount: 0, commenterCount: 0 });
+    } catch (error) {
+      console.error('Lỗi khi refresh counts:', error);
+    }
   };
 
   const columns = [
@@ -353,7 +362,8 @@ const UserPage = () => {
         isFavorite={isFavorite}
         handleToggleFavorite={handleToggleFavorite}
         handleViewDetails={handleViewDetails}
-        onClose={handleModalClose}
+        onClose={() => setModalVisible(false)}
+        refreshCounts={refreshCounts}
       />
     </div>
   );
